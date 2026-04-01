@@ -100,9 +100,13 @@ async def public_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # --- TEXT HANDLER FOR KEYBOARD BUTTONS ---
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip() if update.message.text else ""
-    logger.info(f"Received message: '{text}' from user {update.effective_user.id}")
+    user_id = update.effective_user.id
     
-    if "تنفيذ مهام" in text:
+    # 🔴 Diagnostic Print (Check Railway Logs for this!)
+    print(f"DEBUG: Received message '{text}' from {user_id}")
+    
+    if "مهام" in text:
+        print("DEBUG: Task button detected, calling show_tasks...")
         await tasks.show_tasks(update, context)
     elif "حسابي" in text or "رصيدي" in text:
         await profile(update, context)

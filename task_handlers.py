@@ -9,8 +9,13 @@ WAITING_FOR_PROOF = 1
 
 async def show_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     tasks = db.get_available_tasks()
+    user_id = update.effective_user.id
+    
+    # Diagnostic logging
+    print(f"🔍 User {user_id} requested tasks. Found: {len(tasks)} available tasks.")
+    
     if not tasks:
-        await update.message.reply_text("✨ **لا توجد مهام متاحة حالياً. تفقدنا لاحقاً!**", parse_mode="Markdown")
+        await update.effective_message.reply_text("✨ **لا توجد مهام متاحة حالياً. تفقدنا لاحقاً!**", parse_mode="Markdown")
         return
 
     keyboard = []
@@ -20,7 +25,7 @@ async def show_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard.append([InlineKeyboardButton(btn_text, callback_query_data=f"task_{task[0]}")])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(s.TASKS_MENU_MSG, reply_markup=reply_markup, parse_mode="Markdown")
+    await update.effective_message.reply_text(s.TASKS_MENU_MSG, reply_markup=reply_markup, parse_mode="Markdown")
 
 async def task_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query

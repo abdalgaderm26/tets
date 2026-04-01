@@ -5,6 +5,7 @@ import database as db
 import config as c
 import strings as s
 import admin_handlers as admin
+import task_handlers as tasks
 from datetime import datetime
 
 # Enable logging
@@ -16,9 +17,10 @@ logger = logging.getLogger(__name__)
 # --- MAIN MENU KEYBOARD ---
 def main_menu_keyboard():
     keyboard = [
-        ["👤 حسابي", "💰 رصيدي"],
+        ["🚀 تنفيذ مهام", "💰 رصيدي"],
         ["🎁 هدية يومية", "👥 دعوة الأصدقاء"],
-        ["📜 الشروط", "📊 الإحصائيات"]
+        ["👤 حسابي", "📊 الإحصائيات"],
+        ["📜 الشروط"]
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
@@ -99,10 +101,12 @@ async def public_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     
-    if text == "👤 حسابي":
+    if text == "🚀 تنفيذ مهام":
+        await tasks.show_tasks(update, context)
+    elif text == "👤 حسابي":
         await profile(update, context)
     elif text == "💰 رصيدي":
-        await profile(update, context) # Same as profile for simplicity
+        await profile(update, context)
     elif text == "🎁 هدية يومية":
         await daily_gift(update, context)
     elif text == "👥 دعوة الأصدقاء":
@@ -125,14 +129,25 @@ def main():
     application.add_handler(CommandHandler("daily", daily_gift))
     application.add_handler(CommandHandler("points", profile))
     application.add_handler(CommandHandler("invite", invite))
-    application.add_handler(CommandHandler("stats", public_stats)) # Public stats
+    application.add_handler(CommandHandler("stats", public_stats))
+    
+    # Task Handlers
+    application.add_handler(CallbackQueryHandler(tasks.task_callback, pattern="^task_"))
+    application.add_handler(CallbackQueryHandler(tasks.start_submission, pattern="^submit_"))
+    application.add_handler(MessageHandler(filters.PHOTO, tasks.handle_proof))
     
     # Admin Handlers
     application.add_handler(CommandHandler("admin", lambda update, context: update.message.reply_text(s.ADMIN_CMD_LIST, parse_mode="Markdown")))
     application.add_handler(CommandHandler("broadcast", admin.broadcast))
     application.add_handler(CommandHandler("add", admin.add_points_cmd))
     application.add_handler(CommandHandler("sub", admin.sub_points_cmd))
+    application.add_handler(CommandHandler("add_task", admin.add_task_cmd))
     application.add_handler(CommandHandler("stats_admin", admin.stats))
+    
+    # Admin Callbacks
+    application.add_handler(CallbackQueryHandler(admin.approve_callback, pattern="^appr_"))
+    application.add_handler(CallbackQueryHandler(admin.reject_menu_callback, pattern="^rejmenu_"))
+    application.add_handler(CallbackQueryHandler(admin.final_reject_callback, pattern="^rej_"))
     
     # Text Messages
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))

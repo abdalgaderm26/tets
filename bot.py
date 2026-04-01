@@ -423,13 +423,9 @@ def main():
     
     # Admin Handlers
     application.add_handler(CommandHandler("admin", admin.admin_main_menu))
-    application.add_handler(CommandHandler("pending", admin.pending_dashboard))
-    application.add_handler(CommandHandler("broadcast", admin.broadcast))
-    application.add_handler(CommandHandler("add", admin.add_points_cmd))
-    application.add_handler(CommandHandler("sub", admin.sub_points_cmd))
+    
+    # Core Admin Commands
     application.add_handler(CommandHandler("add_task", admin.add_task_cmd))
-    application.add_handler(CommandHandler("debug_tasks", admin.debug_tasks_cmd))
-    application.add_handler(CommandHandler("stats_admin", admin.stats))
     application.add_handler(CommandHandler("set_api_key", admin.set_api_key_cmd))
     application.add_handler(CommandHandler("set_setting", admin.set_setting_cmd))
     application.add_handler(CommandHandler("add_package", admin.add_package_cmd))

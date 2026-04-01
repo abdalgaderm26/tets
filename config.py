@@ -14,6 +14,11 @@ ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))  # Replace with your Telegram ID if n
 WELCOME_POINTS = 10
 REFERRAL_POINTS = 5
 DAILY_POINTS = 2
+MIN_WITHDRAW = 500
+
+# AI Configuration (Gemini)
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "AIzaSyBANNn8byDuYUXpc6cIDdCKXCKuFITfcmk")
+GEMINI_MODEL = "gemini-2.0-flash"
 
 # Force Subscribe Configuration (Optional)
 CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME", "")  # e.g. "@mychannel"

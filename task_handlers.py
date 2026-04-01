@@ -60,6 +60,12 @@ async def start_submission(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await query.edit_message_text(s.WAIT_FOR_PROOF, parse_mode="Markdown")
 
+import os
+import vision_ai
+import logging
+
+logger = logging.getLogger(__name__)
+
 async def handle_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     task_id = context.user_data.get('waiting_for_proof')
     if not task_id:
@@ -68,36 +74,57 @@ async def handle_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     photo = update.message.photo[-1] # Get highest resolution
     file_id = photo.file_id
+    file_unique_id = photo.file_unique_id
     
-    success = db.submit_proof(user_id, task_id, file_id)
+    # 1. Register submission and check for duplicates
+    sub_id = db.submit_proof(user_id, task_id, file_id, file_unique_id)
     
-    if success:
-        # Clear state
-        del context.user_data['waiting_for_proof']
-        await update.message.reply_text(s.PROOF_SUBMITTED, parse_mode="Markdown")
+    if sub_id == "ALREADY_SUBMITTED":
+        await update.message.reply_text("❌ **لقد أرسلت إثباتاً لهذه المهمة مسبقاً!** انتظر المراجعة.")
+        return
+    elif sub_id == "DUPLICATE_PHOTO":
+        await update.message.reply_text(s.DUPLICATE_PHOTO_ERROR, parse_mode="Markdown")
+        return
         
-        # Notify Admin
+    # Clear state
+    del context.user_data['waiting_for_proof']
+    
+    # 2. AI Vision Analysis
+    status_msg = await update.message.reply_text(s.AI_VERIFYING, parse_mode="Markdown")
+    
+    # Download the photo
+    try:
+        new_file = await photo.get_file()
+        path = f"tmp_proof_{user_id}.jpg"
+        await new_file.download_to_drive(path)
+        
         task = db.get_task_by_id(task_id)
-        # Get the submission ID (last insert)
-        # We need a way to get it, or just use user_id + task_id
-        # Let's rebuild the message with relevant buttons
-        # We'll need the submission entry to get its ID for buttons
-        all_users = db.get_all_users() # Just to find admin, or use config
+        ai_result = await vision_ai.analyze_screenshot(path, task[2])
         
-        # Send to Admin
-        admin_keyboard = [
-            [InlineKeyboardButton("✅ موافقة", callback_data=f"approve_{user_id}_{task_id}")],
-            [InlineKeyboardButton("❌ رفض", callback_data=f"reject_menu_{user_id}_{task_id}")]
-        ]
+        # Cleanup file
+        if os.path.exists(path):
+            os.remove(path)
+            
+        if ai_result == "PASS":
+            # AUTO-APPROVE
+            res = db.approve_submission(sub_id)
+            if res:
+                reward = task[3]
+                await status_msg.edit_text(s.AI_AUTO_APPROVED.format(reward=reward), parse_mode="Markdown")
+                # Also notify admin of auto-approval
+                await context.bot.send_photo(
+                    c.ADMIN_ID,
+                    photo=file_id,
+                    caption=f"✨ **تمت الموافقة التلقائية!**\nعن طريق الذكاء الاصطناعي.\n\n👤 المستخدم: `{user_id}`\n💰 المكافأة: {reward}",
+                    parse_mode="Markdown"
+                )
+                return
+                
+        # If AI is unsure or failed, or auto-approve failed
+        await status_msg.edit_text(s.PROOF_SUBMITTED, parse_mode="Markdown")
         
-        # Actually we need submission table ID for safer buttons, but this works if user_id is unique per task.
-        # Let's find the submission ID
-        conn = db.sqlite3.connect(db.DB_NAME)
-        cursor = conn.cursor()
-        cursor.execute("SELECT id FROM user_tasks WHERE user_id = ? AND task_id = ? ORDER BY id DESC LIMIT 1", (user_id, task_id))
-        sub_id = cursor.fetchone()[0]
-        conn.close()
-        
+        # Notify Admin with AI suggestion
+        ai_label = "❌ لم ينجح" if ai_result == "FAIL" else "❓ غير متأكد"
         admin_keyboard = [
             [InlineKeyboardButton("✅ موافقة", callback_data=f"appr_{sub_id}")],
             [InlineKeyboardButton("❌ رفض", callback_data=f"rejmenu_{sub_id}")]
@@ -106,9 +133,19 @@ async def handle_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_photo(
             c.ADMIN_ID,
             photo=file_id,
-            caption=s.NEW_SUBMISSION_MSG.format(user_id=user_id, url=task[1], reward=task[3]),
+            caption=s.NEW_SUBMISSION_AI_MSG.format(
+                user_id=user_id, 
+                url=task[1], 
+                reward=task[3],
+                ai_suggestion=ai_label
+            ),
             reply_markup=InlineKeyboardMarkup(admin_keyboard),
             parse_mode="Markdown"
         )
-    else:
-        await update.message.reply_text("❌ **لقد أرسلت إثباتاً لهذه المهمة مسبقاً!** انتظر المراجعة.")
+        
+    except Exception as e:
+        logger.error(f"Error handling proof: {str(e)}")
+        await status_msg.edit_text(s.PROOF_SUBMITTED, parse_mode="Markdown")
+        # Notify Admin without AI info
+        admin_keyboard = [[InlineKeyboardButton("✅ موافقة", callback_data=f"appr_{sub_id}")], [InlineKeyboardButton("❌ رفض", callback_data=f"rejmenu_{sub_id}")]]
+        await context.bot.send_photo(c.ADMIN_ID, photo=file_id, caption=s.NEW_SUBMISSION_MSG.format(user_id=user_id, url=task[1], reward=task[3]), reply_markup=InlineKeyboardMarkup(admin_keyboard), parse_mode="Markdown")

@@ -8,7 +8,7 @@ load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN", "8622390945:AAHEmKQlnk0PIzrMl7bdMpKiHPNlF6m6yAI").strip()
 
 # Admin ID (Your Telegram ID) - Used for admin commands
-ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))  # Replace with your Telegram ID if not in .env
+ADMIN_ID = int(os.getenv("ADMIN_ID", "5047634413"))
 
 # Rewards Configuration
 WELCOME_POINTS = 10

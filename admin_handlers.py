@@ -565,6 +565,23 @@ async def review_campaigns_callback(update: Update, context: ContextTypes.DEFAUL
         parse_mode="Markdown"
     )
 
+async def campaign_approve_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    c_id = int(query.data.split("_")[1])
+    res = db.approve_campaign(c_id)
+    
+    if res:
+        u_id, url = res
+        await query.edit_message_text(f"✅ **تم تفعيل حملة الترويج بنجاح!**")
+        try:
+            await context.bot.send_message(u_id, "✅ **تهانينا!** تمت الموافقة على حملة الترويج الخاصة بك وهي الآن نشطة للمستخدمين. 🚀")
+        except:
+            pass
+    else:
+        await query.edit_message_text("❌ **خطأ في المعالجة.**")
+
 # --- MAINTENANCE & REFRESH ---
 
 async def toggle_maintenance_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):

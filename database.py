@@ -129,8 +129,8 @@ def add_task(url, task_type, reward, total_needed):
     cursor = conn.cursor()
     created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     cursor.execute("""
-        INSERT INTO tasks (url, task_type, reward, total_needed, created_at)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO tasks (url, task_type, reward, total_needed, completed_count, status, created_at)
+        VALUES (?, ?, ?, ?, 0, 1, ?)
     """, (url, task_type, reward, total_needed, created_at))
     conn.commit()
     conn.close()

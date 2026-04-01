@@ -99,20 +99,20 @@ async def public_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # --- TEXT HANDLER FOR KEYBOARD BUTTONS ---
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
-    logger.info(f"Received message: {text} from user {update.effective_user.id}")
+    text = update.message.text.strip() if update.message.text else ""
+    logger.info(f"Received message: '{text}' from user {update.effective_user.id}")
     
-    if text == "🚀 تنفيذ مهام":
+    if "تنفيذ مهام" in text:
         await tasks.show_tasks(update, context)
-    elif text == "👤 حسابي" or text == "💰 رصيدي":
+    elif "حسابي" in text or "رصيدي" in text:
         await profile(update, context)
-    elif text == "🎁 هدية يومية":
+    elif "هدية يومية" in text:
         await daily_gift(update, context)
-    elif text == "👥 دعوة الأصدقاء":
+    elif "دعوة الأصدقاء" in text:
         await invite(update, context)
-    elif text == "📊 الإحصائيات":
+    elif "الإحصائيات" in text:
         await public_stats(update, context)
-    elif text == "📜 الشروط":
+    elif "الشروط" in text:
         await update.message.reply_text("⚖️ **قوانين البوت:**\n\n1. يمنع الغش باستخدام حسابات وهمية.\n2. أي محاولة تلاعب ستؤدي لحظر الحساب.")
 
 # --- MAIN ---
@@ -141,6 +141,7 @@ def main():
     application.add_handler(CommandHandler("add", admin.add_points_cmd))
     application.add_handler(CommandHandler("sub", admin.sub_points_cmd))
     application.add_handler(CommandHandler("add_task", admin.add_task_cmd))
+    application.add_handler(CommandHandler("debug_tasks", admin.debug_tasks_cmd))
     application.add_handler(CommandHandler("stats_admin", admin.stats))
     
     # Admin Callbacks

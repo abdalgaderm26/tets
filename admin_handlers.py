@@ -147,3 +147,25 @@ async def final_reject_callback(update: Update, context: ContextTypes.DEFAULT_TY
             pass
     else:
         await query.edit_message_caption("❌ **خطأ في معالجة الرفض.**")
+
+# --- DEBUG COMMAND ---
+
+async def debug_tasks_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != c.ADMIN_ID:
+        return
+        
+    conn = db.sqlite3.connect(db.DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM tasks")
+    rows = cursor.fetchall()
+    conn.close()
+    
+    if not rows:
+        await update.message.reply_text("📭 **لا توجد أي مهام في قاعدة البيانات حالياً.**")
+        return
+        
+    msg = "📝 **قائمة جميع المهام في القاعدة:**\n\n"
+    for r in rows:
+        msg += f"🆔 {r[0]} | 🔗 {r[1][:20]}... | 💰 {r[3]} | 👥 {r[5]}/{r[4]} | 🟢 {r[6]}\n"
+    
+    await update.message.reply_text(msg, parse_mode="Markdown")

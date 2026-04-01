@@ -1,204 +1,63 @@
-# CENTRALIZED ARABIC MESSAGES
-# All emoji-rich and professional marketing texts are here.
+# Multilingual Strings System
+# STRINGS[lang][key]
 
-START_MSG = """
-🌟 **أهلاً بك في بوت الربح والهدايا!** 🌟
-
-يسعدنا انضمامك إلينا. لقد حصلت على **10 نقاط** كهدية ترحيبية! 🎁
-
-استخدم القائمة أدناه لجمع النقاط ودعوة أصدقائك للربح أكثر.
-"""
-
-PROFILE_MSG = """
-👤 **معلومات حسابك**
-
-🆔 **الأيدي:** `{user_id}`
-💰 **رصيدك الحالي:** `{points}` نقطة
-📅 **تاريخ الانضمام:** `{joined_at}`
-"""
-
-DAILY_SUCCESS = "✅ **تم استلام هديتك اليومية!** لقد حصلت على **{amount}** نقاط."
-DAILY_WAIT = "⏳ **عذراً!** لقد استلمت هديتك اليومية بالفعل. يرجى المحاولة مرة أخرى بعد **24 ساعة**."
-
-INVITE_MSG = """
-👥 **ادعُ أصدقاءك واربح!**
-
-شارك رابط الإحالة الخاص بك مع أصدقائك. ستحصل على **5 نقاط** مقابل كل شخص يسجل عبر رابطك! 🚀
-
-🔗 **رابط الإحالة الخاص بك:**
-`{referral_link}`
-"""
-
-REFERRAL_NOTIFICATION = "🎉 **بشرى سارة!** لقد اشترك شخص ما عبر رابط الإحالة الخاص بك وحصلت على **5 نقاط!**"
-
-ADMIN_CMD_LIST = """
-👮 **لوحة تحكم المدير**
-
-/stats - عرض إحصائيات البوت
-/broadcast [رسالة] - إرسال رسالة لجميع المستخدمين
-/add [ID] [النقاط] - إضافة نقاط لمستخدم
-/sub [ID] [النقاط] - خصم نقاط من مستخدم
-/pending - لوحة مراجعة الطلبات المعلقة
-/set_api_key [key] - تحديث مفتاح الذكاء الاصطناعي
-/set_setting [key] [val] - تعديل الإعدادات
-/add_package [pts] [price] [curr] - إضافة باقة شحن
-/review_deposits - مراجعة طلبات الشحن
-/review_campaigns - مراجعة طلبات الترويج
-"""
-
-STATS_MSG = """
-📊 **إحصائيات البوت**
-
-👥 **إجمالي المستخدمين:** `{total_users}`
-💰 **إجمالي النقاط الموزعة:** `{total_points}`
-"""
-
-BROADCAST_START = "📢 **جاري بدء الإرسال الجماعي...**"
-BROADCAST_DONE = "✅ **تم الانتهاء من الإرسال الجماعي بنجاح!**"
-
-FORCE_SUB_MSG = "⚠️ **يجب عليك الاشتراك في القناة أولاً لتتمكن من استخدام البوت!**\n\n📌 اشترك هنا: {channel}"
-
-# --- TIKTOK TASKS STRINGS ---
-
-TASKS_MENU_MSG = """
-🚀 **قائمة المهام المتاحة**
-
-اختر مهمة من القائمة أدناه، قم بتنفيذها وأرسل إثبات (لقطة شاشة) للحصول على النقاط! 💰
-"""
-
-TASK_DETAILS_MSG = """
-📽️ **تفاصيل المهمة**
-
-🔗 **الرابط:** {url}
-📝 **النوع:** {type}
-💰 **الجائزة:** {reward} نقطة
-
-⚠️ **تعليمات:**
-1. اضغط على الرابط أعلاه.
-2. قم بـ ({type}).
-3. التقط صورة للشاشة (Screenshot) تثبت ذلك.
-4. اضغط على "إرسال الإثبات" بالأسفل وارفع الصورة.
-"""
-
-WAIT_FOR_PROOF = "📸 **من فضلك أرسل لقطة الشاشة (الصورة) الآن كإثبات للتنفيذ:**"
-
-PROOF_SUBMITTED = "✅ **تم استلام الإثبات بنجاح!**\nسيقوم المدير بمراجعته وإضافة النقاط لك فور التأكد. شكرًا لصبرك! ⏳"
-
-# --- ADMIN TASK STRINGS ---
-
-NEW_SUBMISSION_MSG = """
-📥 **إثبات جديد للمراجعة!**
-
-👤 **المستخدم:** `{user_id}`
-🔗 **المهمة:** {url}
-💰 **الجائزة:** {reward} نقطة
-"""
-
-APPROVE_SUCCESS = "✅ **تمت الموافقة!** تم إضافة {reward} نقطة للمستخدم."
-REJECT_SUCCESS = "❌ **تم الرفض!** تم إرسال سبب الرفض للمستخدم."
-
-REJECT_REASONS = {
-    "bad_image": "❌ **نعتذر، تم رفض طلبك.**\nالسبب: الصورة غير واضحة أو لا تظهر التنفيذ بشكل صحيح.",
-    "wrong_account": "❌ **نعتذر، تم رفض طلبك.**\nالسبب: الحساب المستخدم لا يتطابق مع المطلوب.",
-    "not_done": "❌ **نعتذر، تم رفض طلبك.**\nالسبب: يبدو أنك لم تقم بالمهمة كاملة (متابعة/إعجاب/تعليق).",
-    "duplicate": "❌ **نعتذر، تم رفض طلبك.**\nالسبب: لقد قمت بإرسال هذا الإثبات مسبقاً."
+STRINGS = {
+    'ar': {
+        'START_MSG': "🌟 **أهلاً بك في بوت الربح والهدايا!** 🌟\n\nيسعدنا انضمامك إلينا. لقد حصلت على **10 نقاط** كهدية ترحيبية! 🎁\n\nاستخدم القائمة أدناه لجمع النقاط ودعوة أصدقائك للربح أكثر.",
+        'PROFILE_MSG': "👤 **معلومات حسابك**\n\n🆔 **الأيدي:** `{user_id}`\n💰 **رصيدك الحالي:** `{points}` نقطة\n📅 **تاريخ الانضمام:** `{joined_at}`\n💎 **الحالة:** {status}",
+        'DAILY_SUCCESS': "✅ **تم استلام هديتك اليومية!** لقد حصلت على **{amount}** نقاط.",
+        'DAILY_WAIT': "⏳ **عذراً!** لقد استلمت هديتك اليومية بالفعل. يرجى المحاولة مرة أخرى بعد **24 ساعة**.",
+        'INVITE_MSG': "👥 **ادعُ أصدقاءك واربح!**\n\nشارك رابط الإحالة الخاص بك مع أصدقائك. ستحصل على **5 نقاط** مقابل كل شخص يسجل عبر رابطك! 🚀\n\n🔗 **رابط الإحالة الخاص بك:**\n`{referral_link}`",
+        'REFERRAL_NOTIFICATION': "🎉 **بشرى سارة!** لقد اشترك شخص ما عبر رابط الإحالة الخاص بك وحصلت على **5 نقاط!**",
+        'TASKS_MENU_MSG': "🚀 **قائمة المهام المتاحة**\n\nاختر مهمة من القائمة أدناه، قم بتنفيذها وأرسل إثبات (لقطة شاشة) للحصول على النقاط! 💰",
+        'TASK_DETAILS_MSG': "📽️ **تفاصيل المهمة**\n\n🔗 **الرابط:** {url}\n📝 **النوع:** {type}\n💰 **الجائزة:** {reward} نقطة\n\n⚠️ **تعليمات:**\n1. اضغط على الرابط أعلاه.\n2. قم بـ ({type}).\n3. التقط صورة للشاشة (Screenshot) تثبت ذلك.\n4. اضغط على \"إرسال الإثبات\" بالأسفل وارفع الصورة.",
+        'WAIT_FOR_PROOF': "📸 **من فضلك أرسل لقطة الشاشة (الصورة) الآن كإثبات للتنفيذ:**",
+        'PROOF_SUBMITTED': "✅ **تم استلام الإثبات بنجاح!**\nسيقوم المدير بمراجعته وإضافة النقاط لك فور التأكد. شكرًا لصبرك! ⏳",
+        'SHOP_CURRENCY_MSG': "🛒 **متجر النقاط العالمي**\n\nمن فضلك اختر العملة التي تود الدفع بها:",
+        'SHOP_PACKAGES_MSG': "📦 **الباقات المتاحة لعملة {currency}:**\n\nاختر الباقة المناسبة لك:",
+        'SHOP_INSTRUCTIONS_MSG': "📝 **تعليمات الدفع ({points} نقطة):**\n\n{instructions}\n\n⚠️ **بعد التحويل، أرسل صورة الإثبات (ScreenShot) هنا فوراً.**",
+        'SHOP_DEPOSIT_SUBMITTED': "✅ **تم استلام إثبات الدفع!**\nسيتم مراجعة الطلب وإضافة النقاط لحسابك فور التأكد. شكرًا لك!",
+        'PROMO_MENU_MSG': "🚀 **روج لصفحتك على تيك توك**\n\nيمكنك الآن استخدام نقاطك للحصول على متابعين حقيقيين لصفحتك!\n\n1. أدخل رابط صفحتك.\n2. حدد ميزانية النقاط.\n3. حدد الجائزة لكل متابع (سيتم خصم عمولة {commission}% للمنصة).",
+        'HISTORY_MSG': "📜 **سجل آخر العمليات في حسابك:**\n\n{history}",
+        'USER_BANNED_MSG': "🚫 **عذراً! تم حظر حسابك من استخدام البوت.**",
+        'RATE_LIMIT_MSG': "⚠️ **تمهل قليلاً!** يرجى عدم إرسال الكثير من الطلبات في وقت واحد.",
+        'VIP_INFO_MSG': "💎 **عضوية VIP الاحترافية**\n\nاستمتع بمميزات حصرية:\n✅ **مضاعفة الأرباح ({multiplier}x)** من جميع المهام.\n✅ **أولوية** في مراجعة السحوبات.\n✅ **شارة مميزة** في ملفك الشخصي.\n\n💰 **سعر الاشتراك (30 يوم):** {price} نقطة.",
+        'VIP_SUCCESS': "🎉 **تهانينا!** لقد أصبحت عضواً VIP الآن. استمتع بمضاعفة أرباحك!",
+        'VIP_INSUFFICIENT': "❌ **عذراً!** رصيدك لا يكفي لشراء عضوية VIP.",
+        'LANG_PICKER': "🌐 **الرجاء اختيار اللغة الخاصة بك / Please choose your language:**",
+        'SUPPORT_MSG': "💬 **قسم الدعم الفني**\n\nأرسل رسالتك هنا وسيقوم الفريق بالرد عليك في أقرب وقت ممكن.",
+        'SUPPORT_SUBMITTED': "✅ **تم إرسال رسالتك للدعم الفني!**\nيرجى الانتظار، سيصلك الرد هنا قريباً.",
+        'MAINTENANCE_MSG': "🛠️ **نحن في صيانة حالياً!**\n\nنقوم ببعض التحديثات المهمة لجعل تجربتكم أفضل. سنعود للعمل قريباً جداً. شكراً لصبركم! 🙏",
+        'BACKUP_SUCCESS': "💾 **تم استخراج نسخة احتياطية من قاعدة البيانات بنجاح.**",
+        'REFRESH_MSG': "🔄 **جاري تحديث النظام...**\nسيتم إعادة تشغيل البوت الآن لتطبيق التعديلات."
+    },
+    'en': {
+        'START_MSG': "🌟 **Welcome to the Rewards Bot!** 🌟\n\nWe're glad to have you. You've received **10 points** as a welcome gift! 🎁\n\nUse the menu below to collect points and invite friends to earn more.",
+        'PROFILE_MSG': "👤 **Your Profile Info**\n\n🆔 **User ID:** `{user_id}`\n💰 **Current Balance:** `{points}` Points\n📅 **Joined At:** `{joined_at}`\n💎 **Status:** {status}",
+        'DAILY_SUCCESS': "✅ **Daily gift received!** You got **{amount}** points.",
+        'DAILY_WAIT': "⏳ **Sorry!** You've already claimed your daily gift. Try again in **24 hours**.",
+        'INVITE_MSG': "👥 **Invite Friends & Win!**\n\nShare your referral link. You get **5 points** for every person who registers via your link! 🚀\n\n🔗 **Your Referral Link:**\n`{referral_link}`",
+        'REFERRAL_NOTIFICATION': "🎉 **Great News!** Someone joined using your link and you earned **5 points!**",
+        'TASKS_MENU_MSG': "🚀 **Available Tasks**\n\nChoose a task, complete it, and send a screenshot to get points! 💰",
+        'TASK_DETAILS_MSG': "📽️ **Task Details**\n\n🔗 **Link:** {url}\n📝 **Type:** {type}\n💰 **Reward:** {reward} Points\n\n⚠️ **Instructions:**\n1. Click the link above.\n2. Complete the ({type}) task.\n3. Take a screenshot as proof.\n4. Click \"Submit Proof\" below and upload the image.",
+        'WAIT_FOR_PROOF': "📸 **Please send the screenshot (image) now as proof of completion:**",
+        'PROOF_SUBMITTED': "✅ **Proof received successfully!**\nThe admin will review it and add points shortly. Thanks for your patience! ⏳",
+        'SHOP_CURRENCY_MSG': "🛒 **Global Points Store**\n\nPlease choose your payment currency:",
+        'SHOP_PACKAGES_MSG': "📦 **Available Packages for {currency}:**\n\nSelect the best package for you:",
+        'SHOP_INSTRUCTIONS_MSG': "📝 **Payment Instructions ({points} Points):**\n\n{instructions}\n\n⚠️ **After transfer, send the screenshot proof here immediately.**",
+        'SHOP_DEPOSIT_SUBMITTED': "✅ **Payment proof received!**\nPoints will be added once verified. Thank you!",
+        'PROMO_MENU_MSG': "🚀 **Promote Your TikTok Page**\n\nUse your points to get real followers!\n\n1. Enter your page link.\n2. Set total budget.\n3. Set reward per follower (Platform takes {commission}% commission).",
+        'HISTORY_MSG': "📜 **Recent Transactions History:**\n\n{history}",
+        'USER_BANNED_MSG': "🚫 **Sorry! Your account is banned.**",
+        'RATE_LIMIT_MSG': "⚠️ **Slow down!** Please do not send too many requests at once.",
+        'VIP_INFO_MSG': "💎 **Premium VIP Membership**\n\nEnjoy exclusive benefits:\n✅ **Double Rewards ({multiplier}x)** from all tasks.\n✅ **Priority** in withdrawal reviews.\n✅ **Special Badge** in your profile.\n\n💰 **Price (30 Days):** {price} Points.",
+        'VIP_SUCCESS': "🎉 **Congratulations!** You are now a VIP member. Enjoy double earnings!",
+        'VIP_INSUFFICIENT': "❌ **Sorry!** You don't have enough points for VIP membership.",
+        'LANG_PICKER': "🌐 **Please choose your language:**",
+        'SUPPORT_MSG': "💬 **Technical Support**\n\nSend your message here and our team will reply to you as soon as possible.",
+        'SUPPORT_SUBMITTED': "✅ **Your message has been sent to support!**\nPlease wait, you will receive a reply here shortly.",
+        'MAINTENANCE_MSG': "🛠️ **System Maintenance!**\n\nWe are doing some important updates. We will be back online very soon. Thank you for your patience! 🙏",
+        'BACKUP_SUCCESS': "💾 **Database backup generated successfully.**",
+        'REFRESH_MSG': "🔄 **Updating system...**\nThe bot will restart now to apply changes."
+    }
 }
-
-REJECT_REPLY_USER = "📝 **تنبيه:** {reason}"
-
-# --- WITHDRAWAL STRINGS ---
-
-WITHDRAW_MENU_MSG = """
-💰 **سحب الأرباح**
-
-يمكنك تحويل نقاطك إلى رصيد أو تحويل بنكي.
-الحد الأدنى للسحب هو: **{min_points}** نقطة.
-
-اختر وسيلة السحب المفضلة:
-"""
-
-WITHDRAW_AMOUNT_MSG = "💵 **أدخل عدد النقاط التي تود سحبها:**\n(يجب أن يكون الرقم أكبر من أو يساوي {min_points})"
-
-WITHDRAW_DETAILS_MSG = """
-📝 **بيانات التحويل**
-
-من فضلك أرسل تفاصيل التحويل (رقم الهاتف للرصيد أو بيانات الحساب للتحويل):
-"""
-
-WITHDRAW_SUCCESS = "✅ **تم إرسال طلب السحب بنجاح!**\nسيتم مراجعة طلبك وتحويل المبلغ خلال 24-48 ساعة."
-WITHDRAW_FAILED_POINTS = "❌ **عذراً!** رصيدك غير كافي لإتمام هذه العملية."
-WITHDRAW_FAILED_MIN = "❌ **عذراً!** الحد الأدنى للسحب هو **{min_points}** نقطة."
-
-WITHDRAW_APPROVE_USER = "✅ **مبروك!** تمت الموافقة على طلب السحب الخاص بك بقيمة **{amount}** نقطة وتم التحويل بنجاح."
-WITHDRAW_REJECT_USER = "❌ **نعتذر!** تم رفض طلب السحب الخاص بك بقيمة **{amount}** نقطة وتم إعادة النقاط لرصيدك."
-
-# --- ADMIN DASHBOARD ---
-
-ADMIN_PENDING_MSG = """
-📋 **لوحة مراجعة الطلبات المعلقة**
-
-🔘 **طلبات المهام:** `{task_count}`
-🔘 **طلبات السحب:** `{withd_count}`
-
-استخدم الأزرار أدناه للبدء في المراجعة:
-"""
-
-ADMIN_NEW_WITHDRAW_MSG = """
-💰 **طلب سحب جديد!**
-
-👤 **المستخدم:** `{user_id}`
-💵 **المبلغ:** `{amount}` نقطة
-🔌 **الوسيلة:** `{method}`
-📝 **التفاصيل:** `{details}`
-"""
-
-# --- SMART AI & ANTI-FRAUD STRINGS ---
-
-AI_VERIFYING = "🤖 **جاري فحص الإثبات بالذكاء الاصطناعي...**\nيرجى الانتظار لحظات."
-AI_AUTO_APPROVED = "✨ **تم التحقق بنجاح!**\nلقد تأكد الذكاء الاصطناعي من تنفيذك للمهمة، وتم إضافة **{reward}** نقطة لرصيدك آلياً. ✅"
-
-DUPLICATE_PHOTO_ERROR = "❌ **عذراً!** هذه الصورة تم استخدامها من قبل كإثبات. يرجى إرسال إثبات حقيقي وخاص بك لتجنب الحظر. ⚠️"
-
-NEW_SUBMISSION_AI_MSG = """
-📥 **إثبات جديد (مراجعة ذكية)**
-
-👤 **المستخدم:** `{user_id}`
-🔗 **المهمة:** {url}
-💰 **الجائزة:** {reward} نقطة
-🤖 **رأي الذكاء الاصطناعي:** {ai_suggestion}
-"""
-
-# --- SHOP (DEPOSIT) STRINGS ---
-
-SHOP_CURRENCY_MSG = "🛒 **متجر النقاط**\n\nمن فضلك اختر العملة التي تود الدفع بها:"
-SHOP_PACKAGES_MSG = "📦 **الباقات المتاحة لعملة {currency}:**\n\nاختر الباقة المناسبة لك:"
-SHOP_INSTRUCTIONS_MSG = "📝 **تعليمات الدفع ({points} نقطة):**\n\n{instructions}\n\n⚠️ **بعد التحويل، أرسل صورة الإثبات (ScreenShot) هنا فوراً.**"
-SHOP_DEPOSIT_SUBMITTED = "✅ **تم استلام إثبات الدفع!**\nسيتم مراجعة الطلب وإضافة النقاط لحسابك فور التأكد. شكرًا لك!"
-
-# --- PROMOTION STRINGS ---
-
-PROMO_MENU_MSG = """
-🚀 **روج لصفحتك على تيك توك**
-
-يمكنك الآن استخدام نقاطك للحصول على متابعين حقيقيين لصفحتك!
-
-1. أدخل رابط صفحتك.
-2. حدد ميزانية النقاط.
-3. حدد الجائزة لكل متابع (سيتم خصم عمولة {commission}% للمنصة).
-"""
-
-PROMO_ENTER_URL = "🔗 **أرسل رابط صفحة تيك توك التي تود ترويجها:**"
-PROMO_ENTER_BUDGET = "💰 **كم عدد النقاط الإجمالي الذي تود استثماره في هذه الحملة؟**"
-PROMO_ENTER_REWARD = "🎁 **كم عدد النقاط التي ستعطيها لكل متابع؟**\n(ملاحظة: سيحصل المتابع على {net_reward} نقطة بعد خصم العمولة)."
-PROMO_SUCCESS = "✅ **تم إرسال طلب الترويج بنجاح!**\nسيتم مراجعة الطلب وتفعيله فوراً من قبل الإدارة."
-
-# --- TRANSACTION STRINGS ---
-
-HISTORY_MSG = "📜 **سجل آخر العمليات في حسابك:**\n\n{history}"
-HISTORY_ITEM = "🔹 {date} | {type} | {amount} نقطة\n📝 {desc}\n"
-
-# --- SECURITY STRINGS ---
-
-USER_BANNED_MSG = "🚫 **عذراً! تم حظر حسابك من استخدام البوت.**\nإذا كنت تعتقد أن هذا خطأ، يرجى التواصل مع الإدارة."
-RATE_LIMIT_MSG = "⚠️ **تمهل قليلاً!** يرجى عدم إرسال الكثير من الطلبات في وقت واحد. انتظر لحظات وحاول مجدداً."
-ADMIN_ACTION_LOGGED = "✅ **تم تنفيذ الإجراء وتسجيله في سجل التدقيق.**"

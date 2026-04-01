@@ -109,13 +109,28 @@ async def handle_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # AUTO-APPROVE
             res = db.approve_submission(sub_id)
             if res:
-                reward = task[3]
-                await status_msg.edit_text(s.AI_AUTO_APPROVED.format(reward=reward), parse_mode="Markdown")
+                base_reward = task[3]
+                final_reward = base_reward
+                
+                # VIP Multiplier Logic
+                if db.is_vip(user_id):
+                    multiplier = float(db.get_setting('vip_multiplier', '2.0'))
+                    final_reward = int(base_reward * multiplier)
+                    extra = final_reward - base_reward
+                    if extra > 0:
+                        db.add_points(user_id, extra)
+                
+                lang = db.get_user_lang(user_id)
+                reward_msg = s.STRINGS[lang]['AI_AUTO_APPROVED'].format(reward=final_reward)
+                if final_reward > base_reward:
+                    reward_msg += f"\n💎 (+{final_reward - base_reward} VIP Bonus!)"
+                    
+                await status_msg.edit_text(reward_msg, parse_mode="Markdown")
                 # Also notify admin of auto-approval
                 await context.bot.send_photo(
                     c.ADMIN_ID,
                     photo=file_id,
-                    caption=f"✨ **تمت الموافقة التلقائية!**\nعن طريق الذكاء الاصطناعي.\n\n👤 المستخدم: `{user_id}`\n💰 المكافأة: {reward}",
+                    caption=f"✨ **تمت الموافقة التلقائية!**\nعن طريق الذكاء الاصطناعي.\n\n👤 المستخدم: `{user_id}`\n💰 المكافأة: {final_reward}",
                     parse_mode="Markdown"
                 )
                 return

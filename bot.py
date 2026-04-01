@@ -7,6 +7,7 @@ import strings as s
 import admin_handlers as admin
 import task_handlers as tasks
 import promo_handlers as promo
+import vip_handlers as vip
 from datetime import datetime
 import time
 
@@ -16,16 +17,39 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# --- MULTILINGUAL HELPER ---
+
+def get_str(user_id, key, **kwargs):
+    lang = db.get_user_lang(user_id)
+    text = s.STRINGS.get(lang, s.STRINGS['ar']).get(key, s.STRINGS['ar'].get(key, key))
+    if kwargs:
+        return text.format(**kwargs)
+    return text
+
 # --- MAIN MENU KEYBOARD ---
-def main_menu_keyboard():
-    keyboard = [
-        ["🚀 تنفيذ مهام", "💰 رصيد"],
-        ["🛒 شراء نقاط", "🚀 ترويج"],
-        ["🎁 هدية يومية", "👥 دعوة"],
-        ["📜 السجل", "💰 سحب الأرباح"],
-        ["👤 حسابي", "📊 الإحصائيات"],
-        ["📜 الشروط"]
-    ]
+def main_menu_keyboard(user_id):
+    lang = db.get_user_lang(user_id)
+    
+    if lang == 'en':
+        keyboard = [
+            ["🚀 Tasks", "💰 Balance"],
+            ["🛒 Buy Points", "🚀 Promote"],
+            ["🎁 Daily Gift", "👥 Invite"],
+            ["📜 History", "💰 Withdraw"],
+            ["👤 Account", "📊 Stats"],
+            ["💎 VIP", "🌐 Language"],
+            ["💬 Support"]
+        ]
+    else:
+        keyboard = [
+            ["🚀 تنفيذ مهام", "💰 رصيد"],
+            ["🛒 شراء نقاط", "🚀 ترويج"],
+            ["🎁 هدية يومية", "👥 دعوة"],
+            ["📜 السجل", "💰 سحب الأرباح"],
+            ["👤 حسابي", "📊 الإحصائيات"],
+            ["💎 VIP", "🌐 اللغة"],
+            ["💬 الدعم الفني"]
+        ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 # --- SECURITY CHECK (BAN & RATE LIMIT) ---
@@ -33,12 +57,18 @@ def main_menu_keyboard():
 async def check_security(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     
-    # 1. Ban Check
+    # 1. Maintenance Mode Check
+    if user_id != c.ADMIN_ID:
+        if db.get_setting('maintenance_mode', 'off') == 'on':
+            await update.message.reply_text(get_str(user_id, 'MAINTENANCE_MSG'), parse_mode="Markdown")
+            return False
+            
+    # 2. Ban Check
     if db.is_user_banned(user_id):
-        await update.effective_message.reply_text(s.USER_BANNED_MSG, parse_mode="Markdown")
+        await update.message.reply_text(get_str(user_id, 'USER_BANNED_MSG'), parse_mode="Markdown")
         return False
         
-    # 2. Rate Limit (1 request per 1.5 seconds)
+    # 3. Rate Limit Check (1 request per 1.5 seconds)
     now = time.time()
     last_req = context.user_data.get('last_req_time', 0)
     if now - last_req < 1.5:
@@ -137,6 +167,27 @@ async def show_history(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         
     await update.message.reply_text(s.HISTORY_MSG.format(history=history_text), parse_mode="Markdown")
+
+# --- LANGUAGE PICKER ---
+
+async def start_language_picker(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [
+        [InlineKeyboardButton("العربية 🇸🇦", callback_data="setlang_ar"),
+         InlineKeyboardButton("English 🇺🇸", callback_data="setlang_en")]
+    ]
+    await update.message.reply_text(s.STRINGS['ar']['LANG_PICKER'], reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+
+async def set_language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    lang = query.data.split("_")[1]
+    user_id = update.effective_user.id
+    db.set_user_lang(user_id, lang)
+    
+    msg = "✅ تم تحديث اللغة!" if lang == 'ar' else "✅ Language updated!"
+    await query.edit_message_text(msg)
+    await context.bot.send_message(user_id, get_str(user_id, 'START_MSG'), reply_markup=main_menu_keyboard(user_id), parse_mode="Markdown")
 
 # --- WITHDRAWAL FLOW ---
 async def start_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -262,7 +313,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         s.START_MSG,
-        reply_markup=main_menu_keyboard(),
+        reply_markup=main_menu_keyboard(user.id),
         parse_mode="Markdown"
     )
 
@@ -336,27 +387,44 @@ async def show_all_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_security(update, context):
         return
-    text = update.message.text.strip() if update.message.text else ""
     user_id = update.effective_user.id
+    text = update.message.text.strip() if update.message.text else ""
     
-    # Admin Actions (Broadcasting, etc)
-    if user_id == c.ADMIN_ID and context.user_data.get('admin_action') == 'broadcasting':
-        if text.lower() == '/cancel':
-            del context.user_data['admin_action']
-            await update.message.reply_text("❌ **تم إلغاء الإرسال الجماعي.**")
-            return
+    # Check if admin is providing a setting value
+    if user_id == c.ADMIN_ID and context.user_data.get('awaiting_admin_setting'):
+        await admin.handle_admin_setting_input(update, context)
+        return
         
-        await update.message.reply_text(s.BROADCAST_START, parse_mode="Markdown")
-        users = db.get_all_users()
+    # Check if admin is replying to support
+    if user_id == c.ADMIN_ID and context.user_data.get('replyING_to'):
+        await admin.handle_support_reply_text(update, context)
+        return
+        
+    # Check if user is sending a support message
+    if context.user_data.get('state') == 'support_msg':
+        del context.user_data['state']
+        await update.message.reply_text(get_str(user_id, 'SUPPORT_SUBMITTED'), parse_mode="Markdown")
+        # Forward to admin
+        keyboard = [[InlineKeyboardButton("✍️ الرد على المستخدم", callback_data=f"supreply_{user_id}")]]
+        await context.bot.send_message(
+            c.ADMIN_ID,
+            f"💬 **رسالة دعم فني جديدة!**\n\n👤 المستخدم: `{user_id}`\n📝 الرسالة: {text}",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"
+        )
+        return
+        
+    # Check if admin is broadcasting
+    if user_id == c.ADMIN_ID and context.user_data.get('admin_action') == 'broadcasting':
+        del context.user_data['admin_action']
+        all_users = db.get_all_users()
         count = 0
-        for u in users:
+        for u in all_users:
             try:
                 await context.bot.send_message(u[0], text, parse_mode="Markdown")
                 count += 1
-            except:
-                continue
-        del context.user_data['admin_action']
-        await update.message.reply_text(f"✅ {s.BROADCAST_DONE}\nتم الإرسال لـ {count} مستخدم.")
+            except: pass
+        await update.message.reply_text(f"✅ تم الإرسال لـ {count} مستخدم.")
         return
 
     if await process_withdraw_text(update, context):
@@ -367,8 +435,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if "مهام" in text:
         await show_all_tasks(update, context)
-    elif "حسابي" in text or "رصيدي" in text:
+    elif "حسابي" in text or "Account" in text:
         await profile(update, context)
+    elif "💎 VIP" in text or "VIP" in text:
+        await vip.start_vip_menu(update, context)
+    elif "الدعم" in text or "Support" in text:
+        context.user_data['state'] = 'support_msg'
+        await update.message.reply_text(get_str(user_id, 'SUPPORT_MSG'), parse_mode="Markdown")
     elif "هدية يومية" in text:
         await daily_gift(update, context)
     elif "سحب الأرباح" in text:
@@ -379,9 +452,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await promo.start_promo(update, context)
     elif "السجل" in text:
         await show_history(update, context)
-    elif "دعوة" in text:
-        await public_stats(update, context)
-    elif "الشروط" in text:
+    elif "دعوة" in text or "Invite" in text:
+        await invite(update, context)
+    elif "اللغة" in text or "Language" in text:
+        await start_language_picker(update, context)
+    elif "الإحصائيات" in text or "Stats" in text:
         await update.message.reply_text("⚖️ **قوانين البوت:**\n\n1. يمنع الغش باستخدام حسابات وهمية.\n2. أي محاولة تلاعب ستؤدي لحظر الحساب.")
 
 # --- MAIN ---
@@ -436,9 +511,18 @@ def main():
     application.add_handler(CallbackQueryHandler(admin.admin_main_menu, pattern="^admin_main$"))
     application.add_handler(CallbackQueryHandler(admin.stats_callback, pattern="^admin_stats$"))
     application.add_handler(CallbackQueryHandler(admin.admin_settings_menu, pattern="^admin_settings$"))
+    application.add_handler(CallbackQueryHandler(admin.admin_setting_edit_start, pattern="^set_"))
     application.add_handler(CallbackQueryHandler(admin.admin_broadcast_start, pattern="^admin_broadcast$"))
     application.add_handler(CallbackQueryHandler(admin.admin_add_package_start, pattern="^admin_add_pkg_start$"))
     application.add_handler(CallbackQueryHandler(admin.admin_logs_view_callback, pattern="^admin_logs_view$"))
+    application.add_handler(CallbackQueryHandler(admin.pending_dashboard, pattern="^admin_pending$"))
+    application.add_handler(CallbackQueryHandler(admin.toggle_maintenance_callback, pattern="^toggle_maintenance$"))
+    application.add_handler(CallbackQueryHandler(admin.admin_refresh_callback, pattern="^admin_refresh$"))
+    application.add_handler(CallbackQueryHandler(admin.admin_backup_callback, pattern="^admin_backup$"))
+    application.add_handler(CallbackQueryHandler(admin.support_reply_start, pattern="^supreply_"))
+    
+    application.add_handler(CallbackQueryHandler(set_language_callback, pattern="^setlang_"))
+    application.add_handler(CallbackQueryHandler(vip.buy_vip_callback, pattern="^vip_buy$"))
     
     application.add_handler(CallbackQueryHandler(admin.review_tasks_callback, pattern="^rev_tasks$"))
     application.add_handler(CallbackQueryHandler(admin.review_withd_callback, pattern="^rev_withd$"))

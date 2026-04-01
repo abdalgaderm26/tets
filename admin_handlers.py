@@ -174,46 +174,116 @@ async def sub_points_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"❌ **خطأ:** {str(e)}")
 
-# --- TASK MANAGEMENT ---
+# --- ADVANCED SETTINGS MENU ---
 
-# --- ADMIN MAIN MENU (BUTTONS) ---
-
-def admin_buttons_keyboard():
+async def admin_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    if query:
+        await query.answer()
+        exec_func = query.edit_message_text
+    else:
+        exec_func = update.message.reply_text
+        
     keyboard = [
-        [InlineKeyboardButton("📊 إحصائيات النظام", callback_data="admin_stats")],
-        [InlineKeyboardButton("📋 مراجعة المهام", callback_data="rev_tasks"), 
-         InlineKeyboardButton("💰 مراجعة السحوبات", callback_data="rev_withd")],
-        [InlineKeyboardButton("🛒 مراجعة الشحن", callback_data="rev_deposits"), 
-         InlineKeyboardButton("🚀 مراجعة الترويج", callback_data="rev_campaigns")],
-        [InlineKeyboardButton("📢 إرسال جماعي", callback_data="admin_broadcast")],
-        [InlineKeyboardButton("⚙️ إعدادات البوت", callback_data="admin_settings"),
-         InlineKeyboardButton("📦 إضافة باقة شحن", callback_data="admin_add_pkg_start")],
-        [InlineKeyboardButton("📜 سجل التدقيق", callback_data="admin_logs_view")]
+        [InlineKeyboardButton("💳 محفظة USDT (TRC20)", callback_data="set_usdt_start")],
+        [InlineKeyboardButton("🏦 الحساب البنكي (بنكك)", callback_data="set_bank_start")],
+        [InlineKeyboardButton("💎 سعر الـ VIP", callback_data="set_vprice_start")],
+        [InlineKeyboardButton("📈 مضاعف الـ VIP", callback_data="set_vmult_start")],
+        [InlineKeyboardButton("🔙 العودة للقائمة", callback_data="admin_main")]
     ]
-    return InlineKeyboardMarkup(keyboard)
+    
+    # Get current values for info
+    usdt = db.get_setting('usdt_wallet', 'غير محدد')
+    v_mult = db.get_setting('vip_multiplier', '2.0')
+    v_price = db.get_setting('vip_price', '1000')
+    
+    msg = f"⚙️ **إعدادات المنصة العالمية**\n\n💰 **USDT:** `{usdt}`\n📈 **VIP Multiplier:** `{v_mult}x`\n💎 **VIP Price:** `{v_price}` pts\n\nاختر الإعداد الذي تود تعديله:"
+    
+    await exec_func(
+        msg,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="Markdown"
+    )
+
+async def admin_setting_edit_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    setting_type = query.data # e.g., "set_usdt_start"
+    context.user_data['awaiting_admin_setting'] = setting_type
+    
+    labels = {
+        "set_usdt_start": "محفظة USDT (TRC20)",
+        "set_bank_start": "بيانات الحساب البنكي",
+        "set_vprice_start": "سعر اشتراك الـ VIP (بالنقاط)",
+        "set_vmult_start": "مضاعف أرباح الـ VIP (مثلاً 2.0)"
+    }
+    
+    label = labels.get(setting_type, "الإعداد")
+    await query.edit_message_text(f"📝 **تعديل {label}**\n\nمن فضلك أرسل القيمة الجديدة الآن:")
+
+async def handle_admin_setting_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != c.ADMIN_ID:
+        return
+        
+    setting_type = context.user_data.get('awaiting_admin_setting')
+    if not setting_type:
+        return
+        
+    new_val = update.message.text
+    
+    map_keys = {
+        "set_usdt_start": "usdt_wallet",
+        "set_bank_start": "bankak_details",
+        "set_vprice_start": "vip_price",
+        "set_vmult_start": "vip_multiplier"
+    }
+    
+    db_key = map_keys.get(setting_type)
+    db.set_setting(db_key, new_val)
+    
+    del context.user_data['awaiting_admin_setting']
+    
+    await update.message.reply_text(f"✅ **تم تحديث الإعداد بنجاح!**\nالقيمة الجديدة: `{new_val}`", parse_mode="Markdown")
+    # Show menu again
+    await admin_settings_menu(update, context)
+
+# --- ADMIN DASHBOARD ---
 
 async def admin_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != c.ADMIN_ID:
         return
         
-    msg = "👮 **لوحة تحكم المدير الاحترافية**\n\nمرحباً بك! اختر القسم الذي تود إدارته من الأزرار أدناه:"
+    text = "👮 **لوحة تحكم المدير - النظام العالمي**\n\nمرحباً بك! اختر القسم الذي تود إدارته:"
+    
+    # Check maintenance status
+    m_mode = db.get_setting('maintenance_mode', 'off')
+    m_icon = "🟢" if m_mode == 'off' else "🔴"
+    text += f"\n\n⚙️ حالة الصيانة: {m_icon} **{m_mode.upper()}**"
     
     if update.callback_query:
-        await update.callback_query.edit_message_text(msg, reply_markup=admin_buttons_keyboard(), parse_mode="Markdown")
+        await update.callback_query.answer()
+        await update.callback_query.edit_message_text(text, reply_markup=admin_buttons_keyboard(), parse_mode="Markdown")
     else:
-        await update.message.reply_text(msg, reply_markup=admin_buttons_keyboard(), parse_mode="Markdown")
+        await update.message.reply_text(text, reply_markup=admin_buttons_keyboard(), parse_mode="Markdown")
 
-async def admin_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
+async def admin_buttons_keyboard():
+    m_mode = db.get_setting('maintenance_mode', 'off')
+    m_text = "🛠️ تفعيل الصيانة" if m_mode == 'off' else "✅ إنهاء الصيانة"
     
-    msg = """
-⚙️ **إعدادات النظام**
+    keyboard = [
+        [InlineKeyboardButton("📋 مراجعة الطلبات", callback_data="admin_pending")],
+        [InlineKeyboardButton("⚙️ إعدادات النظام", callback_data="admin_settings"), 
+         InlineKeyboardButton("📈 الإحصائيات", callback_data="admin_stats")],
+        [InlineKeyboardButton("📢 إرسال جماعي", callback_data="admin_broadcast"),
+         InlineKeyboardButton("📦 إضافة باقة", callback_data="admin_add_pkg_start")],
+        [InlineKeyboardButton("💾 نسخة احتياطية", callback_data="admin_backup"),
+         InlineKeyboardButton(m_text, callback_data="toggle_maintenance")],
+        [InlineKeyboardButton("🔄 تحديث البوت", callback_data="admin_refresh")],
+        [InlineKeyboardButton("📜 سجل الأمان", callback_data="admin_logs_view")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
 
-للتعديل، استخدم الأوامر التالية (مؤقتاً):
-• `/set_api_key [KEY]` - مفتاح الذكاء الاصطناعي
-• `/set_setting [KEY] [VAL]` - أي إعداد آخر
-• `/add_package [PTS] [PRICE] [CURR]` - إضافة باقة
 
 **الإعدادات الحالية:**
 """
@@ -327,12 +397,27 @@ async def approve_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     res = db.approve_submission(sub_id)
     
     if res:
-        user_id, reward = res
+        user_id, base_reward = res
+        
+        # VIP Multiplier Logic
+        final_reward = base_reward
+        if db.is_vip(user_id):
+            multiplier = float(db.get_setting('vip_multiplier', '2.0'))
+            final_reward = int(base_reward * multiplier)
+            # Update balance with the EXTRA points (base is already added by db.approve_submission)
+            extra = final_reward - base_reward
+            if extra > 0:
+                db.add_points(user_id, extra)
+        
         db.log_admin_action(c.ADMIN_ID, "APPROVE_TASK", user_id)
-        await query.edit_message_caption(s.APPROVE_SUCCESS.format(reward=reward), parse_mode="Markdown")
+        await query.edit_message_caption(s.STRINGS['ar']['APPROVE_SUCCESS'].format(reward=final_reward) if db.get_user_lang(user_id) == 'ar' else f"✅ Approved! {final_reward} points added.", parse_mode="Markdown")
+        
         # Notify user
         try:
-            await context.bot.send_message(user_id, f"✅ **تهانينا!** تمت الموافقة على الإثبات وتم إضافة **{reward}** نقطة لرصيدك.")
+            msg = f"✅ **تهانينا!** تمت الموافقة على الإثبات وتم إضافة **{final_reward}** نقطة لرصيدك."
+            if final_reward > base_reward:
+                msg += f"\n💎 (بما في ذلك مكافأة الـ VIP بمقدار {final_reward - base_reward} نقطة!)"
+            await context.bot.send_message(user_id, msg, parse_mode="Markdown")
         except:
             pass
     else:
@@ -491,19 +576,81 @@ async def review_campaigns_callback(update: Update, context: ContextTypes.DEFAUL
         parse_mode="Markdown"
     )
 
-async def campaign_approve_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# --- MAINTENANCE & REFRESH ---
+
+async def toggle_maintenance_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
-    c_id = int(query.data.split("_")[1])
-    res = db.approve_campaign(c_id)
+    current = db.get_setting('maintenance_mode', 'off')
+    new_mode = 'on' if current == 'off' else 'off'
+    db.set_setting('maintenance_mode', new_mode)
     
-    if res:
-        u_id, url = res
-        await query.edit_message_text(f"✅ **تم تفعيل حملة الترويج بنجاح!**")
-        try:
-            await context.bot.send_message(u_id, "✅ **تهانينا!** تمت الموافقة على حملة الترويج الخاصة بك وهي الآن نشطة للمستخدمين. 🚀")
-        except:
-            pass
-    else:
-        await query.edit_message_text("❌ **خطأ في المعالجة.**")
+    db.log_admin_action(c.ADMIN_ID, f"TOGGLE_MAINTENANCE_{new_mode.upper()}", None)
+    await admin_main_menu(update, context)
+
+async def admin_refresh_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = update.effective_user.id
+    lang = db.get_user_lang(user_id)
+    
+    await query.edit_message_text(s.STRINGS[lang]['REFRESH_MSG'], parse_mode="Markdown")
+    db.log_admin_action(c.ADMIN_ID, "BOT_REFRESH", None)
+    
+    # Small delay then exit to trigger Railway restart
+    import sys
+    import os
+    os._exit(0)
+
+async def admin_backup_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = update.effective_user.id
+    lang = db.get_user_lang(user_id)
+    
+    await query.message.reply_chat_action("upload_document")
+    try:
+        with open("bot_database.db", "rb") as db_file:
+            await context.bot.send_document(
+                c.ADMIN_ID,
+                document=db_file,
+                filename=f"backup_{datetime.now().strftime('%Y%m%d_%H%M')}.db",
+                caption=s.STRINGS[lang]['BACKUP_SUCCESS'],
+                parse_mode="Markdown"
+            )
+        db.log_admin_action(c.ADMIN_ID, "DATABASE_BACKUP", None)
+    except Exception as e:
+        await query.message.reply_text(f"❌ **خطأ أثناء النسخ الاحتياطي:** {str(e)}")
+
+# --- SUPPORT SYSTEM (REPLY) ---
+
+async def support_reply_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    target_user_id = query.data.split("_")[1]
+    context.user_data['replyING_to'] = target_user_id
+    
+    await query.message.reply_text(f"📝 **جاري الرد على المستخدم `{target_user_id}`**\nأرسل رسالتك الآن:")
+
+async def handle_support_reply_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    target_uid = context.user_data.get('replyING_to')
+    if not target_uid:
+        return
+        
+    reply_text = update.message.text
+    try:
+        await context.bot.send_message(
+            target_uid, 
+            f"📨 **رد من الدعم الفني:**\n\n{reply_text}",
+            parse_mode="Markdown"
+        )
+        await update.message.reply_text("✅ **تم إرسال الرد بنجاح!**")
+        db.log_admin_action(c.ADMIN_ID, "SUPPORT_REPLY", target_uid)
+    except:
+        await update.message.reply_text("❌ **فشل إرسال الرد. قد يكون المستخدم حظر البوت.**")
+        
+    del context.user_data['replyING_to']

@@ -17,9 +17,18 @@ def init_db():
             last_daily TEXT,
             is_admin INTEGER DEFAULT 0,
             is_banned INTEGER DEFAULT 0,
+            language TEXT DEFAULT 'ar',
+            vip_until TEXT,
             joined_at TEXT
         )
     """)
+    
+    # Check if new columns exist (Migration)
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN language TEXT DEFAULT 'ar'")
+        cursor.execute("ALTER TABLE users ADD COLUMN vip_until TEXT")
+    except sqlite3.OperationalError:
+        pass # Already exists
     
     # Check if is_banned exists (Migration)
     try:
@@ -154,7 +163,11 @@ def init_db():
     ]
     for key, val in defaults:
         cursor.execute("INSERT OR IGNORE INTO settings (id, value) VALUES (?, ?)", (key, val))
-
+    cursor.execute("INSERT OR IGNORE INTO settings (id, value) VALUES ('usdt_wallet', 'TUL8oVJYogpHPqRKXYmjvTPQhdA9b2vNRC')")
+    cursor.execute("INSERT OR IGNORE INTO settings (id, value) VALUES ('vip_multiplier', '2.0')")
+    cursor.execute("INSERT OR IGNORE INTO settings (id, value) VALUES ('vip_price', '1000')")
+    cursor.execute("INSERT OR IGNORE INTO settings (id, value) VALUES ('maintenance_mode', 'off')")
+    
     conn.commit()
     conn.close()
 
@@ -236,6 +249,45 @@ def get_admin_logs(limit=20):
     res = cursor.fetchall()
     conn.close()
     return res
+
+# --- VIP & LANGUAGE HELPERS ---
+
+def is_vip(user_id):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT vip_until FROM users WHERE user_id = ?", (user_id,))
+    res = cursor.fetchone()
+    conn.close()
+    if res and res[0]:
+        try:
+            vip_date = datetime.strptime(res[0], "%Y-%m-%d %H:%M:%S")
+            return datetime.now() < vip_date
+        except:
+            return False
+    return False
+
+def get_user_lang(user_id):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT language FROM users WHERE user_id = ?", (user_id,))
+    res = cursor.fetchone()
+    conn.close()
+    return res[0] if res else 'ar'
+
+def set_user_lang(user_id, lang):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET language = ? WHERE user_id = ?", (lang, user_id))
+    conn.commit()
+    conn.close()
+
+def set_vip(user_id, days):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    expire_date = (datetime.now() + timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("UPDATE users SET vip_until = ? WHERE user_id = ?", (expire_date, user_id))
+    conn.commit()
+    conn.close()
 
 # --- SHOP & PACKAGES ---
 

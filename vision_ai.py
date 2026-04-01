@@ -1,7 +1,7 @@
 import google.generativeai as genai
 import config as c
 import logging
-import db
+import database as db
 
 # Configure logging
 logger = logging.getLogger(__name__)

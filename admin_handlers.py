@@ -285,17 +285,6 @@ async def admin_buttons_keyboard():
     return InlineKeyboardMarkup(keyboard)
 
 
-**الإعدادات الحالية:**
-"""
-    # Quick list of current settings for convenience
-    settings = ["google_api_key", "min_withdraw", "commission_pct", "bankak_details"]
-    for s_key in settings:
-        val = db.get_setting(s_key, "غير محدد")
-        msg += f"• `{s_key}`: `{val[:15]}...`\n"
-
-    keyboard = [[InlineKeyboardButton("🔙 العودة", callback_data="admin_main")]]
-    await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
-
 async def admin_add_package_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()

@@ -100,7 +100,7 @@ async def public_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # --- TASKS DISPLAY LOGIC (MOVED HERE FOR RELIABILITY) ---
 async def show_all_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    tasks_list = db.get_available_tasks()
+    tasks_list = db.get_available_tasks(user_id)
     
     print(f"🔍 User {user_id} clicked Tasks. Found: {len(tasks_list)} tasks in DB.")
     

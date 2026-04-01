@@ -135,13 +135,19 @@ def add_task(url, task_type, reward, total_needed):
     conn.commit()
     conn.close()
 
-def get_available_tasks():
+def get_available_tasks(user_id):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
+    # Get active tasks that:
+    # 1. Have status = 1
+    # 2. Haven't reached their completion limit
+    # 3. User hasn't already submitted proof for (regardless of pending/approved/rejected)
     cursor.execute("""
         SELECT * FROM tasks 
-        WHERE status = 1 AND completed_count < total_needed
-    """)
+        WHERE status = 1 
+        AND completed_count < total_needed
+        AND id NOT IN (SELECT task_id FROM user_tasks WHERE user_id = ?)
+    """, (user_id,))
     tasks = cursor.fetchall()
     conn.close()
     return tasks

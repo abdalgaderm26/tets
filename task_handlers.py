@@ -8,8 +8,8 @@ import config as c
 WAITING_FOR_PROOF = 1
 
 async def show_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    tasks = db.get_available_tasks()
     user_id = update.effective_user.id
+    tasks = db.get_available_tasks(user_id)
     
     # Diagnostic logging
     print(f"🔍 User {user_id} requested tasks. Found: {len(tasks)} available tasks.")

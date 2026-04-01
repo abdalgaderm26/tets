@@ -32,9 +32,8 @@ async def analyze_screenshot(file_path, task_type):
     - FAIL: If you are sure the task is NOT completed (e.g., button still says 'Follow').
     - UNSURE: If the image is blurry, irrelevant, or you cannot tell.
     
-    Do not provide any explanation. Just one word.
-    \"\"\"
-
+    """
+    
     try:
         # Load the image
         with open(file_path, "rb") as f:

@@ -1,8 +1,11 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 import database as db
-import strings as s
 import config as c
+
+def get_str(user_id, key):
+    lang = db.get_user_lang(user_id)
+    return s.STRINGS.get(lang, s.STRINGS['ar']).get(key, s.STRINGS['ar'].get(key, key))
 
 async def pending_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != c.ADMIN_ID:
@@ -16,7 +19,7 @@ async def pending_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     
     await update.message.reply_text(
-        s.ADMIN_PENDING_MSG.format(task_count=task_count, withd_count=withd_count),
+        get_str(update.effective_user.id, 'ADMIN_PENDING_MSG').format(task_count=task_count, withd_count=withd_count),
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
@@ -45,7 +48,7 @@ async def review_tasks_callback(update: Update, context: ContextTypes.DEFAULT_TY
     await context.bot.send_photo(
         c.ADMIN_ID,
         photo=photo_id,
-        caption=s.NEW_SUBMISSION_MSG.format(user_id=user_id, url=task_info[1], reward=task_info[3]),
+        caption=get_str(c.ADMIN_ID, 'NEW_SUBMISSION_MSG').format(user_id=user_id, url=task_info[1], reward=task_info[3]),
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
@@ -70,7 +73,7 @@ async def review_withd_callback(update: Update, context: ContextTypes.DEFAULT_TY
     ]
     
     await query.edit_message_text(
-        s.ADMIN_NEW_WITHDRAW_MSG.format(user_id=user_id, amount=amount, method=method, details=details),
+        get_str(c.ADMIN_ID, 'ADMIN_NEW_WITHDRAW_MSG').format(user_id=user_id, amount=amount, method=method, details=details),
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
@@ -86,7 +89,7 @@ async def withdraw_approve_callback(update: Update, context: ContextTypes.DEFAUL
         user_id, amount = res
         await query.edit_message_text(f"✅ **تمت الموافقة على سحب {amount} نقطة!**")
         try:
-            await context.bot.send_message(user_id, s.WITHDRAW_APPROVE_USER.format(amount=amount), parse_mode="Markdown")
+            await context.bot.send_message(user_id, get_str(user_id, 'WITHDRAW_APPROVE_USER').format(amount=amount), parse_mode="Markdown")
         except:
             pass
     else:
@@ -103,7 +106,7 @@ async def withdraw_reject_callback(update: Update, context: ContextTypes.DEFAULT
         user_id, amount = res
         await query.edit_message_text(f"❌ **تم رفض طلب السحب وإعادة {amount} نقطة للمستخدم.**")
         try:
-            await context.bot.send_message(user_id, s.WITHDRAW_REJECT_USER.format(amount=amount), parse_mode="Markdown")
+            await context.bot.send_message(user_id, get_str(user_id, 'WITHDRAW_REJECT_USER').format(amount=amount), parse_mode="Markdown")
         except:
             pass
     else:
@@ -115,7 +118,7 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     total_users, total_points = db.get_stats()
     await update.message.reply_text(
-        s.STATS_MSG.format(total_users=total_users, total_points=total_points),
+        get_str(update.effective_user.id, 'STATS_MSG').format(total_users=total_users, total_points=total_points),
         parse_mode="Markdown"
     )
 
@@ -130,7 +133,7 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = " ".join(context.args)
     all_users = db.get_all_users()
     
-    await update.message.reply_text(s.BROADCAST_START, parse_mode="Markdown")
+    await update.message.reply_text("📢 **جاري بدء الإرسال الجماعي...**", parse_mode="Markdown")
     
     count = 0
     for user_id in all_users:
@@ -308,7 +311,7 @@ async def stats_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     total_users, total_points = db.get_stats()
     keyboard = [[InlineKeyboardButton("🔙 العودة", callback_data="admin_main")]]
     await query.edit_message_text(
-        s.STATS_MSG.format(total_users=total_users, total_points=total_points),
+        get_str(c.ADMIN_ID, 'STATS_MSG').format(total_users=total_users, total_points=total_points),
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
@@ -399,7 +402,7 @@ async def approve_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 db.add_points(user_id, extra)
         
         db.log_admin_action(c.ADMIN_ID, "APPROVE_TASK", user_id)
-        await query.edit_message_caption(s.STRINGS['ar']['APPROVE_SUCCESS'].format(reward=final_reward) if db.get_user_lang(user_id) == 'ar' else f"✅ Approved! {final_reward} points added.", parse_mode="Markdown")
+        await query.edit_message_caption(get_str(c.ADMIN_ID, 'APPROVE_SUCCESS').format(reward=final_reward) if 'APPROVE_SUCCESS' in s.STRINGS['ar'] else f"✅ Approved! {final_reward} points added.", parse_mode="Markdown")
         
         # Notify user
         try:
@@ -421,9 +424,10 @@ async def reject_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     
     # Ready-made reasons keyboard
     keyboard = []
-    for key, reason in s.REJECT_REASONS.items():
+    reasons = get_str(c.ADMIN_ID, 'REJECT_REASONS')
+    for key, reason in reasons.items():
         # Display short version of reason in button
-        keyboard.append([InlineKeyboardButton(reason.split("\n")[1][:30], callback_data=f"rej_{sub_id}_{key}")])
+        keyboard.append([InlineKeyboardButton(reason.split("\n")[0], callback_data=f"rej_{sub_id}_{key}")])
     
     await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(keyboard))
 
@@ -439,11 +443,12 @@ async def final_reject_callback(update: Update, context: ContextTypes.DEFAULT_TY
     user_id = db.reject_submission(sub_id)
     
     if user_id:
-        reason_text = s.REJECT_REASONS.get(reason_key, "غير محدد")
-        await query.edit_message_caption(s.REJECT_SUCCESS, parse_mode="Markdown")
+        reasons = get_str(c.ADMIN_ID, 'REJECT_REASONS')
+        reason_text = reasons.get(reason_key, "غير محدد")
+        await query.edit_message_caption(get_str(c.ADMIN_ID, 'REJECT_SUCCESS'), parse_mode="Markdown")
         # Notify user with ready reason
         try:
-            await context.bot.send_message(user_id, s.REJECT_REPLY_USER.format(reason=reason_text), parse_mode="Markdown")
+            await context.bot.send_message(user_id, get_str(user_id, 'REJECT_REPLY_USER').format(reason=reason_text), parse_mode="Markdown")
         except:
             pass
     else:

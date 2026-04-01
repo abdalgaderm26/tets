@@ -1,8 +1,11 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler, MessageHandler, filters
 import database as db
-import strings as s
 import config as c
+
+def get_str(user_id, key):
+    lang = db.get_user_lang(user_id)
+    return s.STRINGS.get(lang, s.STRINGS['ar']).get(key, s.STRINGS['ar'].get(key, key))
 
 # Conversation States
 WAITING_FOR_PROOF = 1
@@ -15,7 +18,7 @@ async def show_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print(f"🔍 User {user_id} requested tasks. Found: {len(tasks)} available tasks.")
     
     if not tasks:
-        await update.effective_message.reply_text("✨ **لا توجد مهام متاحة حالياً. تفقدنا لاحقاً!**", parse_mode="Markdown")
+        await update.effective_message.reply_text(get_str(user_id, 'TASKS_MENU_MSG_EMPTY') if 'TASKS_MENU_MSG_EMPTY' in s.STRINGS['ar'] else "✨ **لا توجد مهام متاحة حالياً. تفقدنا لاحقاً!**", parse_mode="Markdown")
         return
 
     keyboard = []
@@ -25,7 +28,7 @@ async def show_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"task_{task[0]}")])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.effective_message.reply_text(s.TASKS_MENU_MSG, reply_markup=reply_markup, parse_mode="Markdown")
+    await update.effective_message.reply_text(get_str(user_id, 'TASKS_MENU_MSG'), reply_markup=reply_markup, parse_mode="Markdown")
 
 async def task_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -46,7 +49,7 @@ async def task_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     
     await query.edit_message_text(
-        s.TASK_DETAILS_MSG.format(url=task[1], type=task[2], reward=task[3]),
+        get_str(update.effective_user.id, 'TASK_DETAILS_MSG').format(url=task[1], type=task[2], reward=task[3]),
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
@@ -58,7 +61,7 @@ async def start_submission(update: Update, context: ContextTypes.DEFAULT_TYPE):
     task_id = int(query.data.split("_")[1])
     context.user_data['waiting_for_proof'] = task_id
     
-    await query.edit_message_text(s.WAIT_FOR_PROOF, parse_mode="Markdown")
+    await query.edit_message_text(get_str(update.effective_user.id, 'WAIT_FOR_PROOF'), parse_mode="Markdown")
 
 import os
 import vision_ai
@@ -83,14 +86,15 @@ async def handle_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ **لقد أرسلت إثباتاً لهذه المهمة مسبقاً!** انتظر المراجعة.")
         return
     elif sub_id == "DUPLICATE_PHOTO":
-        await update.message.reply_text(s.DUPLICATE_PHOTO_ERROR, parse_mode="Markdown")
+        await update.message.reply_text(get_str(user_id, 'DUPLICATE_PHOTO_ERROR') if 'DUPLICATE_PHOTO_ERROR' in s.STRINGS['ar'] else "❌ **هذا الإثبات تم استخدامه من قبل!**", parse_mode="Markdown")
         return
         
     # Clear state
     del context.user_data['waiting_for_proof']
     
     # 2. AI Vision Analysis
-    status_msg = await update.message.reply_text(s.AI_VERIFYING, parse_mode="Markdown")
+    await_msg_text = get_str(user_id, 'AI_VERIFYING') if 'AI_VERIFYING' in s.STRINGS['ar'] else "🔍 **جاري فحص الإثبات بالذكاء الاصطناعي...**"
+    status_msg = await update.message.reply_text(await_msg_text, parse_mode="Markdown")
     
     # Download the photo
     try:
@@ -136,7 +140,7 @@ async def handle_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
                 
         # If AI is unsure or failed, or auto-approve failed
-        await status_msg.edit_text(s.PROOF_SUBMITTED, parse_mode="Markdown")
+        await status_msg.edit_text(get_str(user_id, 'PROOF_SUBMITTED'), parse_mode="Markdown")
         
         # Notify Admin with AI suggestion
         ai_label = "❌ لم ينجح" if ai_result == "FAIL" else "❓ غير متأكد"
@@ -148,7 +152,7 @@ async def handle_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_photo(
             c.ADMIN_ID,
             photo=file_id,
-            caption=s.NEW_SUBMISSION_AI_MSG.format(
+            caption="🚀 **إثبات جديد (AI)**\n\n👤 المستخدم: `{user_id}`\n🔗 الرابط: {url}\n💰 المكافأة: {reward}\n💡 فحص الذكاء الاصطناعي: {ai_suggestion}".format(
                 user_id=user_id, 
                 url=task[1], 
                 reward=task[3],
@@ -160,7 +164,7 @@ async def handle_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     except Exception as e:
         logger.error(f"Error handling proof: {str(e)}")
-        await status_msg.edit_text(s.PROOF_SUBMITTED, parse_mode="Markdown")
+        await status_msg.edit_text(get_str(user_id, 'PROOF_SUBMITTED'), parse_mode="Markdown")
         # Notify Admin without AI info
         admin_keyboard = [[InlineKeyboardButton("✅ موافقة", callback_data=f"appr_{sub_id}")], [InlineKeyboardButton("❌ رفض", callback_data=f"rejmenu_{sub_id}")]]
-        await context.bot.send_photo(c.ADMIN_ID, photo=file_id, caption=s.NEW_SUBMISSION_MSG.format(user_id=user_id, url=task[1], reward=task[3]), reply_markup=InlineKeyboardMarkup(admin_keyboard), parse_mode="Markdown")
+        await context.bot.send_photo(c.ADMIN_ID, photo=file_id, caption="📸 **إثبات جديد للمراجعة اليدوية**\n\n👤 المستخدم: `{user_id}`\n🔗 الرابط: {url}\n💰 المكافأة: {reward}".format(user_id=user_id, url=task[1], reward=task[3]), reply_markup=InlineKeyboardMarkup(admin_keyboard), parse_mode="Markdown")

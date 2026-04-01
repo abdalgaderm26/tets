@@ -1,8 +1,11 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 import database as db
-import strings as s
 import config as c
+
+def get_str(user_id, key):
+    lang = db.get_user_lang(user_id)
+    return s.STRINGS.get(lang, s.STRINGS['ar']).get(key, s.STRINGS['ar'].get(key, key))
 
 async def start_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -11,7 +14,7 @@ async def start_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     commission = db.get_setting('commission_pct', 20)
     
     await update.message.reply_text(
-        s.PROMO_MENU_MSG.format(commission=commission),
+        get_str(user_id, 'PROMO_MENU_MSG').format(commission=commission),
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🎯 البدء الآن", callback_data="promo_start")]]),
         parse_mode="Markdown"
     )
@@ -22,7 +25,7 @@ async def promo_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if query.data == "promo_start":
         context.user_data['promo_step'] = 'url'
-        await query.edit_message_text(s.PROMO_ENTER_URL, parse_mode="Markdown")
+        await query.edit_message_text(get_str(update.effective_user.id, 'PROMO_ENTER_URL'), parse_mode="Markdown")
 
 async def process_promo_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     step = context.user_data.get('promo_step')
@@ -34,7 +37,7 @@ async def process_promo_text(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if step == 'url':
         context.user_data['promo_url'] = text
         context.user_data['promo_step'] = 'budget'
-        await update.message.reply_text(s.PROMO_ENTER_BUDGET, parse_mode="Markdown")
+        await update.message.reply_text(get_str(update.effective_user.id, 'PROMO_ENTER_BUDGET'), parse_mode="Markdown")
         return True
         
     elif step == 'budget':
@@ -76,7 +79,7 @@ async def process_promo_text(update: Update, context: ContextTypes.DEFAULT_TYPE)
             success = db.add_campaign(user_id, url, budget, reward, "Follow")
             if success:
                 db.log_transaction(user_id, -budget, "PROMOTION", f"طلب ترويج لحساب: {url}")
-                await update.message.reply_text(s.PROMO_SUCCESS, parse_mode="Markdown")
+                await update.message.reply_text(get_str(user_id, 'PROMO_SUCCESS'), parse_mode="Markdown")
                 # Notify Admin
                 await context.bot.send_message(c.ADMIN_ID, f"🚀 **طلب ترويج جديد للمراجعة!**\nالمستخدم: `{user_id}`\nالرابط: {url}", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📋 مراجعة الترويجات", callback_data="rev_campaigns")]]))
             else:

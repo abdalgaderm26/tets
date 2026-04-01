@@ -74,7 +74,7 @@ async def check_security(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if now - last_req < 1.5:
         # Only notify once every few spams to avoid spamming the user back
         if not context.user_data.get('notified_rate_limit'):
-            await update.effective_message.reply_text(s.RATE_LIMIT_MSG, parse_mode="Markdown")
+            await update.effective_message.reply_text(get_str(user_id, 'RATE_LIMIT_MSG'), parse_mode="Markdown")
             context.user_data['notified_rate_limit'] = True
         return False
     
@@ -85,6 +85,7 @@ async def check_security(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # --- SHOP (BUY POINTS) FLOW ---
 
 async def start_shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
     currencies = db.get_currencies()
     if not currencies:
         await update.message.reply_text("❌ **المتجر مغلق حالياً.**")
@@ -94,10 +95,11 @@ async def start_shop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for curr in currencies:
         keyboard.append([InlineKeyboardButton(curr, callback_data=f"buycurr_{curr}")])
         
-    await update.message.reply_text(s.SHOP_CURRENCY_MSG, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+    await update.message.reply_text(get_str(user_id, 'SHOP_CURRENCY_MSG'), reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
 async def shop_currency_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    user_id = update.effective_user.id
     await query.answer()
     
     curr = query.data.split("_")[1]
@@ -109,10 +111,11 @@ async def shop_currency_callback(update: Update, context: ContextTypes.DEFAULT_T
         btn_text = f"📦 {p[1]} نقطة - {p[2]} {p[3]}"
         keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"buypkg_{p[0]}")])
         
-    await query.edit_message_text(s.SHOP_PACKAGES_MSG.format(currency=curr), reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+    await query.edit_message_text(get_str(user_id, 'SHOP_PACKAGES_MSG').format(currency=curr), reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
 async def shop_package_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    user_id = update.effective_user.id
     await query.answer()
     
     pkg_id = int(query.data.split("_")[1])
@@ -121,7 +124,7 @@ async def shop_package_callback(update: Update, context: ContextTypes.DEFAULT_TY
     context.user_data['waiting_for_deposit'] = pkg_id
     
     await query.edit_message_text(
-        s.SHOP_INSTRUCTIONS_MSG.format(points=package[1], instructions=package[4]),
+        get_str(user_id, 'SHOP_INSTRUCTIONS_MSG').format(points=package[1], instructions=package[4]),
         parse_mode="Markdown"
     )
 
@@ -136,7 +139,7 @@ async def handle_deposit_proof(update: Update, context: ContextTypes.DEFAULT_TYP
     db.add_deposit_request(user_id, pkg_id, photo_id)
     del context.user_data['waiting_for_deposit']
     
-    await update.message.reply_text(s.SHOP_DEPOSIT_SUBMITTED, parse_mode="Markdown")
+    await update.message.reply_text(get_str(user_id, 'SHOP_DEPOSIT_SUBMITTED'), parse_mode="Markdown")
     
     # Notify Admin
     pkg = db.get_package_by_id(pkg_id)
@@ -159,23 +162,23 @@ async def show_history(update: Update, context: ContextTypes.DEFAULT_TYPE):
     history_text = ""
     for t in txs:
         # t: (id, user_id, amount, type, description, created_at)
-        history_text += s.HISTORY_ITEM.format(
+        history_text += "• {type}: {pts} ({date})\n".format(
             date=t[5].split(" ")[0],
             type=t[3],
-            amount=f"+{t[2]}" if t[2] > 0 else t[2],
-            desc=t[4]
+            pts=f"+{t[2]}" if t[2] > 0 else t[2]
         )
         
-    await update.message.reply_text(s.HISTORY_MSG.format(history=history_text), parse_mode="Markdown")
+    await update.message.reply_text(get_str(user_id, 'HISTORY_MSG').format(history=history_text), parse_mode="Markdown")
 
 # --- LANGUAGE PICKER ---
 
 async def start_language_picker(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
     keyboard = [
         [InlineKeyboardButton("العربية 🇸🇦", callback_data="setlang_ar"),
          InlineKeyboardButton("English 🇺🇸", callback_data="setlang_en")]
     ]
-    await update.message.reply_text(s.STRINGS['ar']['LANG_PICKER'], reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+    await update.message.reply_text(get_str(user_id, 'LANG_PICKER'), reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
 async def set_language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -195,7 +198,7 @@ async def start_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data = db.get_user(user_id)
     
     if user_data[2] < c.MIN_WITHDRAW:
-        await update.message.reply_text(s.WITHDRAW_FAILED_MIN.format(min_points=c.MIN_WITHDRAW), parse_mode="Markdown")
+        await update.message.reply_text(get_str(user_id, 'WITHDRAW_FAILED_MIN').format(min_points=c.MIN_WITHDRAW), parse_mode="Markdown")
         return
 
     keyboard = [
@@ -204,23 +207,25 @@ async def start_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     
     await update.message.reply_text(
-        s.WITHDRAW_MENU_MSG.format(min_points=c.MIN_WITHDRAW),
+        get_str(user_id, 'WITHDRAW_MENU_MSG').format(min_points=c.MIN_WITHDRAW),
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
 
 async def withdraw_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    user_id = update.effective_user.id
     await query.answer()
     
     method = "رصيد" if query.data == "wth_credit" else "تحويل"
     context.user_data['wth_method'] = method
     context.user_data['wth_step'] = 'amount'
     
-    await query.edit_message_text(s.WITHDRAW_AMOUNT_MSG.format(min_points=c.MIN_WITHDRAW), parse_mode="Markdown")
+    await query.edit_message_text(get_str(user_id, 'WITHDRAW_AMOUNT_MSG').format(min_points=c.MIN_WITHDRAW), parse_mode="Markdown")
 
 async def process_withdraw_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     step = context.user_data.get('wth_step')
+    user_id = update.effective_user.id
     if not step:
         return False
         
@@ -230,18 +235,17 @@ async def process_withdraw_text(update: Update, context: ContextTypes.DEFAULT_TY
         try:
             amount = int(text)
             if amount < c.MIN_WITHDRAW:
-                await update.message.reply_text(s.WITHDRAW_FAILED_MIN.format(min_points=c.MIN_WITHDRAW), parse_mode="Markdown")
+                await update.message.reply_text(get_str(user_id, 'WITHDRAW_FAILED_MIN').format(min_points=c.MIN_WITHDRAW), parse_mode="Markdown")
                 return True
             
-            user_id = update.effective_user.id
             user_data = db.get_user(user_id)
             if user_data[2] < amount:
-                await update.message.reply_text(s.WITHDRAW_FAILED_POINTS, parse_mode="Markdown")
+                await update.message.reply_text(get_str(user_id, 'WITHDRAW_FAILED_POINTS'), parse_mode="Markdown")
                 return True
                 
             context.user_data['wth_amount'] = amount
             context.user_data['wth_step'] = 'details'
-            await update.message.reply_text(s.WITHDRAW_DETAILS_MSG, parse_mode="Markdown")
+            await update.message.reply_text(get_str(user_id, 'WITHDRAW_DETAILS_MSG'), parse_mode="Markdown")
             return True
         except ValueError:
             await update.message.reply_text("❌ **من فضلك أدخل رقماً صحيحاً.**")
@@ -250,17 +254,10 @@ async def process_withdraw_text(update: Update, context: ContextTypes.DEFAULT_TY
     elif step == 'details':
         method = context.user_data.get('wth_method')
         amount = context.user_data.get('wth_amount')
-        user_id = update.effective_user.id
         
         success = db.add_withdrawal_request(user_id, amount, method, text)
         if success:
             # Notify Admin
-            admin_kb = [
-                [InlineKeyboardButton("✅ موافقة", callback_data=f"wth_appr_last")],
-                [InlineKeyboardButton("❌ رفض", callback_data=f"wth_rej_last")]
-            ]
-            # Since we don't have the ID yet, we'll fetch it from the next_pending later in dashboard
-            # But for quick review, we can just fetch the last one for this user
             conn = db.sqlite3.connect(db.DB_NAME)
             cursor = conn.cursor()
             cursor.execute("SELECT id FROM withdrawals WHERE user_id = ? ORDER BY id DESC LIMIT 1", (user_id,))
@@ -274,12 +271,12 @@ async def process_withdraw_text(update: Update, context: ContextTypes.DEFAULT_TY
             
             await context.bot.send_message(
                 c.ADMIN_ID,
-                s.ADMIN_NEW_WITHDRAW_MSG.format(user_id=user_id, amount=amount, method=method, details=text),
+                get_str(user_id, 'ADMIN_NEW_WITHDRAW_MSG').format(user_id=user_id, amount=amount, method=method, details=text),
                 reply_markup=InlineKeyboardMarkup(admin_kb),
                 parse_mode="Markdown"
             )
             
-            await update.message.reply_text(s.WITHDRAW_SUCCESS, parse_mode="Markdown")
+            await update.message.reply_text(get_str(user_id, 'WITHDRAW_SUCCESS'), parse_mode="Markdown")
         else:
             await update.message.reply_text("❌ **فشل الطلب! تأكد من رصيدك.**")
             
@@ -307,12 +304,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             db.update_daily_claim(user.id) # Initial setup for daily column
             # Notify referrer
             try:
-                await context.bot.send_message(referrer_id, s.REFERRAL_NOTIFICATION, parse_mode="Markdown")
+                await context.bot.send_message(referrer_id, get_str(referrer_id, 'REFERRAL_NOTIFICATION'), parse_mode="Markdown")
             except:
                 pass
 
     await update.message.reply_text(
-        s.START_MSG,
+        get_str(user.id, 'START_MSG'),
         reply_markup=main_menu_keyboard(user.id),
         parse_mode="Markdown"
     )
@@ -326,7 +323,7 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     await update.message.reply_text(
-        s.PROFILE_MSG.format(
+        get_str(user_id, 'PROFILE_MSG').format(
             user_id=user_data[0],
             points=user_data[2],
             joined_at=user_data[6]
@@ -341,9 +338,9 @@ async def daily_gift(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if db.can_claim_daily(user_id):
         db.add_points(user_id, c.DAILY_POINTS)
         db.update_daily_claim(user_id)
-        await update.message.reply_text(s.DAILY_SUCCESS.format(amount=c.DAILY_POINTS), parse_mode="Markdown")
+        await update.message.reply_text(get_str(user_id, 'DAILY_SUCCESS').format(amount=c.DAILY_POINTS), parse_mode="Markdown")
     else:
-        await update.message.reply_text(s.DAILY_WAIT, parse_mode="Markdown")
+        await update.message.reply_text(get_str(user_id, 'DAILY_WAIT'), parse_mode="Markdown")
 
 # --- INVITE CODE ---
 async def invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -352,15 +349,16 @@ async def invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
     referral_link = f"https://t.me/{bot_username}?start={user_id}"
     
     await update.message.reply_text(
-        s.INVITE_MSG.format(referral_link=referral_link),
+        get_str(user_id, 'INVITE_MSG').format(referral_link=referral_link),
         parse_mode="Markdown"
     )
 
 # --- STATS (Public or Admin) ---
 async def public_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
     total_users, total_points = db.get_stats()
     await update.message.reply_text(
-        s.STATS_MSG.format(total_users=total_users, total_points=total_points),
+        get_str(user_id, 'STATS_MSG').format(total_users=total_users, total_points=total_points),
         parse_mode="Markdown"
     )
 
@@ -381,7 +379,7 @@ async def show_all_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"task_{task[0]}")])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.effective_message.reply_text(s.TASKS_MENU_MSG, reply_markup=reply_markup, parse_mode="Markdown")
+    await update.effective_message.reply_text(get_str(user_id, 'TASKS_MENU_MSG'), reply_markup=reply_markup, parse_mode="Markdown")
 
 # --- TEXT HANDLER FOR KEYBOARD BUTTONS ---
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):

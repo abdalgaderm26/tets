@@ -122,7 +122,7 @@ async def reject_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     keyboard = []
     for key, reason in s.REJECT_REASONS.items():
         # Display short version of reason in button
-        keyboard.append([InlineKeyboardButton(reason.split("\n")[1][:30], callback_query_data=f"rej_{sub_id}_{key}")])
+        keyboard.append([InlineKeyboardButton(reason.split("\n")[1][:30], callback_data=f"rej_{sub_id}_{key}")])
     
     await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(keyboard))
 

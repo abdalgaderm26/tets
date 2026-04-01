@@ -22,7 +22,7 @@ async def show_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for task in tasks:
         # task structure: (id, url, task_type, reward, total_needed, completed_count, status, created_at)
         btn_text = f"🎥 {task[2]} - {task[3]} نقطة"
-        keyboard.append([InlineKeyboardButton(btn_text, callback_query_data=f"task_{task[0]}")])
+        keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"task_{task[0]}")])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.effective_message.reply_text(s.TASKS_MENU_MSG, reply_markup=reply_markup, parse_mode="Markdown")
@@ -42,7 +42,7 @@ async def task_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     keyboard = [
         [InlineKeyboardButton("🔗 اذهب للمهمة", url=task[1])],
-        [InlineKeyboardButton("📸 إرسال الإثبات", callback_query_data=f"submit_{task_id}")]
+        [InlineKeyboardButton("📸 إرسال الإثبات", callback_data=f"submit_{task_id}")]
     ]
     
     await query.edit_message_text(
@@ -86,8 +86,8 @@ async def handle_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Send to Admin
         admin_keyboard = [
-            [InlineKeyboardButton("✅ موافقة", callback_query_data=f"approve_{user_id}_{task_id}")],
-            [InlineKeyboardButton("❌ رفض", callback_query_data=f"reject_menu_{user_id}_{task_id}")]
+            [InlineKeyboardButton("✅ موافقة", callback_data=f"approve_{user_id}_{task_id}")],
+            [InlineKeyboardButton("❌ رفض", callback_data=f"reject_menu_{user_id}_{task_id}")]
         ]
         
         # Actually we need submission table ID for safer buttons, but this works if user_id is unique per task.
@@ -99,8 +99,8 @@ async def handle_proof(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.close()
         
         admin_keyboard = [
-            [InlineKeyboardButton("✅ موافقة", callback_query_data=f"appr_{sub_id}")],
-            [InlineKeyboardButton("❌ رفض", callback_query_data=f"rejmenu_{sub_id}")]
+            [InlineKeyboardButton("✅ موافقة", callback_data=f"appr_{sub_id}")],
+            [InlineKeyboardButton("❌ رفض", callback_data=f"rejmenu_{sub_id}")]
         ]
         
         await context.bot.send_photo(

@@ -111,7 +111,7 @@ async def show_all_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = []
     for task in tasks_list:
         btn_text = f"🎥 {task[2]} - {task[3]} نقطة"
-        keyboard.append([InlineKeyboardButton(btn_text, callback_query_data=f"task_{task[0]}")])
+        keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"task_{task[0]}")])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.effective_message.reply_text(s.TASKS_MENU_MSG, reply_markup=reply_markup, parse_mode="Markdown")

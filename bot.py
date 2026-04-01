@@ -97,17 +97,32 @@ async def public_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
+# --- TASKS DISPLAY LOGIC (MOVED HERE FOR RELIABILITY) ---
+async def show_all_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    tasks_list = db.get_available_tasks()
+    
+    print(f"🔍 User {user_id} clicked Tasks. Found: {len(tasks_list)} tasks in DB.")
+    
+    if not tasks_list:
+        await update.effective_message.reply_text("✨ **لا توجد مهام متاحة حالياً. تفقدنا لاحقاً!**", parse_mode="Markdown")
+        return
+
+    keyboard = []
+    for task in tasks_list:
+        btn_text = f"🎥 {task[2]} - {task[3]} نقطة"
+        keyboard.append([InlineKeyboardButton(btn_text, callback_query_data=f"task_{task[0]}")])
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.effective_message.reply_text(s.TASKS_MENU_MSG, reply_markup=reply_markup, parse_mode="Markdown")
+
 # --- TEXT HANDLER FOR KEYBOARD BUTTONS ---
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip() if update.message.text else ""
     user_id = update.effective_user.id
     
-    # 🔴 Diagnostic Print (Check Railway Logs for this!)
-    print(f"DEBUG: Received message '{text}' from {user_id}")
-    
     if "مهام" in text:
-        print("DEBUG: Task button detected, calling show_tasks...")
-        await tasks.show_tasks(update, context)
+        await show_all_tasks(update, context)
     elif "حسابي" in text or "رصيدي" in text:
         await profile(update, context)
     elif "هدية يومية" in text:

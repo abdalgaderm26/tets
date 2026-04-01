@@ -1,7 +1,7 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
-import database as db
 import config as c
+import strings as s
 
 def get_str(user_id, key):
     lang = db.get_user_lang(user_id)
@@ -543,6 +543,25 @@ async def deposit_approve_callback(update: Update, context: ContextTypes.DEFAULT
     else:
         await query.edit_message_text("❌ **خطأ في المعالجة.**")
 
+async def deposit_reject_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    d_id = int(query.data.split("_")[1])
+    # For now, we just mark as rejected in DB (implementation in db depends on your schema, 
+    # assuming we just update status to 'rejected')
+    user_id = db.reject_deposit(d_id)
+    
+    if user_id:
+        await query.edit_message_text("❌ **تم رفض طلب الشحن.**")
+        try:
+            await context.bot.send_message(user_id, get_str(user_id, 'DEPOSIT_REJECT_USER'), parse_mode="Markdown")
+            db.log_admin_action(c.ADMIN_ID, "REJECT_DEPOSIT", user_id)
+        except:
+            pass
+    else:
+        await query.edit_message_text("❌ **خطأ في المعالجة.**")
+
 # --- CAMPAIGN REVIEW ---
 
 async def review_campaigns_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -582,6 +601,23 @@ async def campaign_approve_callback(update: Update, context: ContextTypes.DEFAUL
         await query.edit_message_text(f"✅ **تم تفعيل حملة الترويج بنجاح!**")
         try:
             await context.bot.send_message(u_id, "✅ **تهانينا!** تمت الموافقة على حملة الترويج الخاصة بك وهي الآن نشطة للمستخدمين. 🚀")
+        except:
+            pass
+    else:
+        await query.edit_message_text("❌ **خطأ في المعالجة.**")
+
+async def campaign_reject_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    c_id = int(query.data.split("_")[1])
+    user_id = db.reject_campaign(c_id)
+    
+    if user_id:
+        await query.edit_message_text("❌ **تم رفض حملة الترويج.**")
+        try:
+            await context.bot.send_message(user_id, get_str(user_id, 'CAMPAIGN_REJECT_USER'), parse_mode="Markdown")
+            db.log_admin_action(c.ADMIN_ID, "REJECT_CAMPAIGN", user_id)
         except:
             pass
     else:

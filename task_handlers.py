@@ -1,7 +1,7 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler, MessageHandler, filters
-import database as db
 import config as c
+import strings as s
 
 def get_str(user_id, key):
     lang = db.get_user_lang(user_id)
@@ -38,14 +38,15 @@ async def task_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     task = db.get_task_by_id(task_id)
     
     if not task:
-        await query.edit_message_text("❌ **المهمة غير موجودة.**")
+        await query.edit_message_text(get_str(update.effective_user.id, 'TASK_NOT_FOUND'))
         return
         
     context.user_data['current_task_id'] = task_id
     
+    lang = db.get_user_lang(update.effective_user.id)
     keyboard = [
-        [InlineKeyboardButton("🔗 اذهب للمهمة", url=task[1])],
-        [InlineKeyboardButton("📸 إرسال الإثبات", callback_data=f"submit_{task_id}")]
+        [InlineKeyboardButton(get_str(update.effective_user.id, 'GO_TO_TASK'), url=task[1])],
+        [InlineKeyboardButton(get_str(update.effective_user.id, 'SUBMIT_PROOF_BTN'), callback_data=f"submit_{task_id}")]
     ]
     
     await query.edit_message_text(

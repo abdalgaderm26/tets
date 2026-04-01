@@ -370,12 +370,13 @@ async def show_all_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     print(f"🔍 User {user_id} clicked Tasks. Found: {len(tasks_list)} tasks in DB.")
     
     if not tasks_list:
-        await update.effective_message.reply_text("✨ **لا توجد مهام متاحة حالياً. تفقدنا لاحقاً!**", parse_mode="Markdown")
+        await update.effective_message.reply_text(get_str(user_id, 'TASKS_EMPTY'), parse_mode="Markdown")
         return
 
     keyboard = []
+    pts_label = get_str(user_id, 'TASK_POINTS_LABEL')
     for task in tasks_list:
-        btn_text = f"🎥 {task[2]} - {task[3]} نقطة"
+        btn_text = f"🎥 {task[2]} - {task[3]} {pts_label}"
         keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"task_{task[0]}")])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -431,31 +432,33 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if await promo.process_promo_text(update, context):
         return
 
-    if "مهام" in text:
+    if "مهام" in text or "Tasks" in text:
         await show_all_tasks(update, context)
     elif "حسابي" in text or "Account" in text:
+        await profile(update, context)
+    elif "رصيد" in text or "Balance" in text:
         await profile(update, context)
     elif "💎 VIP" in text or "VIP" in text:
         await vip.start_vip_menu(update, context)
     elif "الدعم" in text or "Support" in text:
         context.user_data['state'] = 'support_msg'
         await update.message.reply_text(get_str(user_id, 'SUPPORT_MSG'), parse_mode="Markdown")
-    elif "هدية يومية" in text:
+    elif "هدية يومية" in text or "Daily Gift" in text:
         await daily_gift(update, context)
-    elif "سحب الأرباح" in text:
+    elif "سحب الأرباح" in text or "Withdraw" in text:
         await start_withdraw(update, context)
-    elif "شراء نقاط" in text:
+    elif "شراء نقاط" in text or "Buy Points" in text:
         await start_shop(update, context)
-    elif "ترويج" in text:
+    elif "ترويج" in text or "Promote" in text:
         await promo.start_promo(update, context)
-    elif "السجل" in text:
+    elif "السجل" in text or "History" in text:
         await show_history(update, context)
     elif "دعوة" in text or "Invite" in text:
         await invite(update, context)
     elif "اللغة" in text or "Language" in text:
         await start_language_picker(update, context)
     elif "الإحصائيات" in text or "Stats" in text:
-        await update.message.reply_text("⚖️ **قوانين البوت:**\n\n1. يمنع الغش باستخدام حسابات وهمية.\n2. أي محاولة تلاعب ستؤدي لحظر الحساب.")
+        await public_stats(update, context)
 
 # --- MAIN ---
 def main():
@@ -475,7 +478,7 @@ def main():
     # Task Handlers
     application.add_handler(CallbackQueryHandler(tasks.task_callback, pattern="^task_"))
     application.add_handler(CallbackQueryHandler(tasks.start_submission, pattern="^submit_"))
-    application.add_handler(CallbackQueryHandler(withdraw_callback, pattern="^wth_"))
+    application.add_handler(CallbackQueryHandler(withdraw_callback, pattern="^wth_(credit|transfer)$"))
     
     # Shop & Promo Callbacks
     application.add_handler(CallbackQueryHandler(shop_currency_callback, pattern="^buycurr_"))
@@ -533,7 +536,9 @@ def main():
     application.add_handler(CallbackQueryHandler(admin.withdraw_approve_callback, pattern="^wthappr_"))
     application.add_handler(CallbackQueryHandler(admin.withdraw_reject_callback, pattern="^wthrej_"))
     application.add_handler(CallbackQueryHandler(admin.deposit_approve_callback, pattern="^depappr_"))
+    application.add_handler(CallbackQueryHandler(admin.deposit_reject_callback, pattern="^deprej_"))
     application.add_handler(CallbackQueryHandler(admin.campaign_approve_callback, pattern="^cmpappr_"))
+    application.add_handler(CallbackQueryHandler(admin.campaign_reject_callback, pattern="^cmprej_"))
     
     # Text Messages
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))

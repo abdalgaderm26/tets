@@ -100,12 +100,11 @@ async def public_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # --- TEXT HANDLER FOR KEYBOARD BUTTONS ---
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
+    logger.info(f"Received message: {text} from user {update.effective_user.id}")
     
     if text == "🚀 تنفيذ مهام":
         await tasks.show_tasks(update, context)
-    elif text == "👤 حسابي":
-        await profile(update, context)
-    elif text == "💰 رصيدي":
+    elif text == "👤 حسابي" or text == "💰 رصيدي":
         await profile(update, context)
     elif text == "🎁 هدية يومية":
         await daily_gift(update, context)

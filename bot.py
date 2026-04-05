@@ -435,6 +435,29 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text.strip() if update.message.text else ""
     
+    # --- BUG FIX: State Machine Killer ---
+    # If the user clicks a main keyboard button while stuck in a process (like withdraw/promo),
+    # we must clear all states so they don't get 'Enter valid number' errors forever.
+    main_menu_commands = [
+        "تنفيذ مهام", "🚀 Tasks", "👤 حسابي", "👤 Account", "💰 رصيد", "💰 Balance", 
+        "💎 VIP", "💬 Support", "الدعم الفني", "🎁 Daily Gift", "هدية يومية",
+        "💰 Withdraw", "سحب الأرباح", "🛒 Buy Points", "شراء نقاط", "🚀 Promote", "ترويج",
+        "📜 History", "السجل", "👥 Invite", "دعوة", "🌐 Language", "اللغة", 
+        "📊 Stats", "الإحصائيات", "/cancel", "/start"
+    ]
+    
+    is_main_command = any(cmd in text for cmd in main_menu_commands)
+    if is_main_command:
+        # Wipe all hanging states
+        for key in ['state', 'wth_step', 'wth_method', 'wth_amount', 
+                    'promo_step', 'promo_url', 'promo_budget', 'promo_reward',
+                    'awaiting_admin_setting', 'replyING_to', 'admin_action']:
+            context.user_data.pop(key, None)
+            
+        if text == "/cancel":
+            await update.message.reply_text("✅ تم الإلغاء.", parse_mode="Markdown")
+            return
+
     # Check if admin is providing a setting value
     if user_id == c.ADMIN_ID and context.user_data.get('awaiting_admin_setting'):
         await admin.handle_admin_setting_input(update, context)

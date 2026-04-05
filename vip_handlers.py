@@ -33,8 +33,9 @@ async def buy_vip_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
         
     # Process purchase
-    db.add_points(user_id, -price)
-    db.set_vip(user_id, 30) # 30 days
+    # BUG-07 FIX: Use deduct_points() instead of add_points(-price) for correctness
+    db.deduct_points(user_id, price)
+    db.set_vip(user_id, 30)  # 30 days
     db.log_transaction(user_id, -price, "PURCHASE", "شراء عضوية VIP لمدة 30 يوم" if lang == 'ar' else "Purchased VIP for 30 days")
     
     await query.edit_message_text(s.STRINGS[lang]['VIP_SUCCESS'])

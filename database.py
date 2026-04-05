@@ -171,298 +171,284 @@ def init_db():
     conn.commit()
     conn.close()
 
+from contextlib import contextmanager
+@contextmanager
+def get_db_conn():
+    conn = sqlite3.connect(DB_NAME)
+    try:
+        yield conn
+    finally:
+        conn.close()
+
 # --- SETTINGS GETTER/SETTER ---
 
 def get_setting(key, default=None):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT value FROM settings WHERE id = ?", (key,))
-    res = cursor.fetchone()
-    conn.close()
-    return res[0] if res else default
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM settings WHERE id = ?", (key,))
+        res = cursor.fetchone()
+        return res[0] if res else default
 
 def set_setting(key, value):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("INSERT OR REPLACE INTO settings (id, value) VALUES (?, ?)", (key, str(value)))
-    conn.commit()
-    conn.close()
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("INSERT OR REPLACE INTO settings (id, value) VALUES (?, ?)", (key, str(value)))
+        conn.commit()
 
 def log_transaction(user_id, amount, t_type, description):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cursor.execute("""
-        INSERT INTO transactions (user_id, amount, type, description, created_at)
-        VALUES (?, ?, ?, ?, ?)
-    """, (user_id, amount, t_type, description, now))
-    conn.commit()
-    conn.close()
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("""
+            INSERT INTO transactions (user_id, amount, type, description, created_at)
+            VALUES (?, ?, ?, ?, ?)
+        """, (user_id, amount, t_type, description, now))
+        conn.commit()
 
 def get_transactions(user_id, limit=10):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM transactions WHERE user_id = ? ORDER BY id DESC LIMIT ?", (user_id, limit))
-    res = cursor.fetchall()
-    conn.close()
-    return res
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM transactions WHERE user_id = ? ORDER BY id DESC LIMIT ?", (user_id, limit))
+        return cursor.fetchall()
 
 # --- SECURITY & BAN SYSTEM ---
 
 def is_user_banned(user_id):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT is_banned FROM users WHERE user_id = ?", (user_id,))
-    res = cursor.fetchone()
-    conn.close()
-    return res[0] == 1 if res else False
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT is_banned FROM users WHERE user_id = ?", (user_id,))
+        res = cursor.fetchone()
+        return res[0] == 1 if res else False
 
 def ban_user(user_id):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("UPDATE users SET is_banned = 1 WHERE user_id = ?", (user_id,))
-    conn.commit()
-    conn.close()
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET is_banned = 1 WHERE user_id = ?", (user_id,))
+        conn.commit()
 
 def unban_user(user_id):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("UPDATE users SET is_banned = 0 WHERE user_id = ?", (user_id,))
-    conn.commit()
-    conn.close()
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET is_banned = 0 WHERE user_id = ?", (user_id,))
+        conn.commit()
 
 def log_admin_action(admin_id, action, target_user_id=None):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cursor.execute("""
-        INSERT INTO admin_logs (admin_id, action, target_user_id, timestamp)
-        VALUES (?, ?, ?, ?)
-    """, (admin_id, action, target_user_id, now))
-    conn.commit()
-    conn.close()
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("""
+            INSERT INTO admin_logs (admin_id, action, target_user_id, timestamp)
+            VALUES (?, ?, ?, ?)
+        """, (admin_id, action, target_user_id, now))
+        conn.commit()
 
 def get_admin_logs(limit=20):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM admin_logs ORDER BY id DESC LIMIT ?", (limit,))
-    res = cursor.fetchall()
-    conn.close()
-    return res
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM admin_logs ORDER BY id DESC LIMIT ?", (limit,))
+        return cursor.fetchall()
 
 # --- VIP & LANGUAGE HELPERS ---
 
 def is_vip(user_id):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT vip_until FROM users WHERE user_id = ?", (user_id,))
-    res = cursor.fetchone()
-    conn.close()
-    if res and res[0]:
-        try:
-            vip_date = datetime.strptime(res[0], "%Y-%m-%d %H:%M:%S")
-            return datetime.now() < vip_date
-        except:
-            return False
-    return False
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT vip_until FROM users WHERE user_id = ?", (user_id,))
+        res = cursor.fetchone()
+        if res and res[0]:
+            try:
+                vip_date = datetime.strptime(res[0], "%Y-%m-%d %H:%M:%S")
+                return datetime.now() < vip_date
+            except:
+                return False
+        return False
 
 def get_user_lang(user_id):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT language FROM users WHERE user_id = ?", (user_id,))
-    res = cursor.fetchone()
-    conn.close()
-    return res[0] if res else 'ar'
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT language FROM users WHERE user_id = ?", (user_id,))
+        res = cursor.fetchone()
+        return res[0] if res else 'ar'
 
 def set_user_lang(user_id, lang):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("UPDATE users SET language = ? WHERE user_id = ?", (lang, user_id))
-    conn.commit()
-    conn.close()
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET language = ? WHERE user_id = ?", (lang, user_id))
+        conn.commit()
 
 def set_vip(user_id, days):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    expire_date = (datetime.now() + timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
-    cursor.execute("UPDATE users SET vip_until = ? WHERE user_id = ?", (expire_date, user_id))
-    conn.commit()
-    conn.close()
+    # HIGH-02 FIX: Use context manager instead of raw connection
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        expire_date = (datetime.now() + timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("UPDATE users SET vip_until = ? WHERE user_id = ?", (expire_date, user_id))
+        conn.commit()
 
 # --- SHOP & PACKAGES ---
 
 def add_package(points, price, currency, instructions):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO point_packages (points, price, currency, instructions)
-        VALUES (?, ?, ?, ?)
-    """, (points, price, currency, instructions))
-    conn.commit()
-    conn.close()
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO point_packages (points, price, currency, instructions)
+            VALUES (?, ?, ?, ?)
+        """, (points, price, currency, instructions))
+        conn.commit()
 
 def get_currencies():
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT DISTINCT currency FROM point_packages")
-    res = cursor.fetchall()
-    conn.close()
-    return [c[0] for c in res]
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT DISTINCT currency FROM point_packages")
+        res = cursor.fetchall()
+        return [c[0] for c in res]
 
 def get_packages_by_currency(currency):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM point_packages WHERE currency = ?", (currency,))
-    res = cursor.fetchall()
-    conn.close()
-    return res
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM point_packages WHERE currency = ?", (currency,))
+        return cursor.fetchall()
 
 def get_package_by_id(package_id):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM point_packages WHERE id = ?", (package_id,))
-    res = cursor.fetchone()
-    conn.close()
-    return res
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM point_packages WHERE id = ?", (package_id,))
+        return cursor.fetchone()
 
 def add_deposit_request(user_id, package_id, screenshot_id):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cursor.execute("""
-        INSERT INTO deposits (user_id, package_id, screenshot_id, status, created_at)
-        VALUES (?, ?, ?, 'pending', ?)
-    """, (user_id, package_id, screenshot_id, created_at))
-    conn.commit()
-    conn.close()
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("""
+            INSERT INTO deposits (user_id, package_id, screenshot_id, status, created_at)
+            VALUES (?, ?, ?, 'pending', ?)
+        """, (user_id, package_id, screenshot_id, created_at))
+        conn.commit()
 
 def get_next_pending_deposit():
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM deposits WHERE status = 'pending' ORDER BY id ASC LIMIT 1")
-    res = cursor.fetchone()
-    conn.close()
-    return res
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM deposits WHERE status = 'pending' ORDER BY id ASC LIMIT 1")
+        return cursor.fetchone()
 
 def approve_deposit(deposit_id):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    # Get details
-    cursor.execute("SELECT user_id, package_id FROM deposits WHERE id = ?", (deposit_id,))
-    res = cursor.fetchone()
-    if not res:
-        conn.close()
-        return False
-    user_id, package_id = res
-    # Get points
-    cursor.execute("SELECT points FROM point_packages WHERE id = ?", (package_id,))
-    points = cursor.fetchone()[0]
-    # Update
-    cursor.execute("UPDATE deposits SET status = 'approved' WHERE id = ?", (deposit_id,))
-    cursor.execute("UPDATE users SET points = points + ? WHERE user_id = ?", (points, user_id))
-    conn.commit()
-    conn.close()
-    return user_id, points
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        # Get details
+        cursor.execute("SELECT user_id, package_id FROM deposits WHERE id = ?", (deposit_id,))
+        res = cursor.fetchone()
+        if not res:
+            return False
+        user_id, package_id = res
+        # Get points
+        cursor.execute("SELECT points FROM point_packages WHERE id = ?", (package_id,))
+        points = cursor.fetchone()[0]
+        # Update
+        cursor.execute("UPDATE deposits SET status = 'approved' WHERE id = ?", (deposit_id,))
+        cursor.execute("UPDATE users SET points = points + ? WHERE user_id = ?", (points, user_id))
+        conn.commit()
+        return user_id, points
 
 # --- CAMPAIGNS (PROMOTION) ---
 
 def add_campaign(user_id, url, budget, reward, task_type):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    # Check budget
-    cursor.execute("SELECT points FROM users WHERE user_id = ?", (user_id,))
-    res = cursor.fetchone()
-    if not res or res[0] < budget:
-        conn.close()
-        return False
-    
-    # Deduct
-    cursor.execute("UPDATE users SET points = points - ? WHERE user_id = ?", (budget, user_id))
-    
-    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cursor.execute("""
-        INSERT INTO user_campaigns (user_id, url, task_type, budget, reward_per_action, status, created_at)
-        VALUES (?, ?, ?, ?, ?, 'pending', ?)
-    """, (user_id, url, task_type, budget, reward, created_at))
-    conn.commit()
-    conn.close()
-    return True
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        # Check budget
+        cursor.execute("SELECT points FROM users WHERE user_id = ?", (user_id,))
+        res = cursor.fetchone()
+        if not res or res[0] < budget:
+            return False
+        
+        # Deduct
+        cursor.execute("UPDATE users SET points = points - ? WHERE user_id = ?", (budget, user_id))
+        
+        created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("""
+            INSERT INTO user_campaigns (user_id, url, task_type, budget, reward_per_action, status, created_at)
+            VALUES (?, ?, ?, ?, ?, 'pending', ?)
+        """, (user_id, url, task_type, budget, reward, created_at))
+        conn.commit()
+        return True
 
 def get_next_pending_campaign():
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM user_campaigns WHERE status = 'pending' ORDER BY id ASC LIMIT 1")
-    res = cursor.fetchone()
-    conn.close()
-    return res
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM user_campaigns WHERE status = 'pending' ORDER BY id ASC LIMIT 1")
+        return cursor.fetchone()
 
 def approve_campaign(campaign_id):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    # Get info
-    cursor.execute("SELECT user_id, url, task_type, reward_per_action, budget FROM user_campaigns WHERE id = ?", (campaign_id,))
-    res = cursor.fetchone()
-    if not res:
-        conn.close()
-        return False
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        # Get info
+        cursor.execute("SELECT user_id, url, task_type, reward_per_action, budget FROM user_campaigns WHERE id = ?", (campaign_id,))
+        res = cursor.fetchone()
+        if not res:
+            return False
+            
+        uid, url, ttype, reward, budget = res
+        total_needed = budget // reward
         
-    uid, url, ttype, reward, budget = res
-    total_needed = budget // reward
-    
-    # Update campaign status
-    cursor.execute("UPDATE user_campaigns SET status = 'approved' WHERE id = ?", (campaign_id,))
-    
-    # Add as a real task for others
-    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cursor.execute("""
-        INSERT INTO tasks (url, task_type, reward, total_needed, completed_count, status, created_at)
-        VALUES (?, ?, ?, ?, 0, 1, ?)
-    """, (url, ttype, reward, total_needed, created_at))
-    
-    conn.commit()
-    conn.close()
-    return uid, url
+        # Update campaign status
+        cursor.execute("UPDATE user_campaigns SET status = 'approved' WHERE id = ?", (campaign_id,))
+        
+        # Add as a real task for others
+        created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("""
+            INSERT INTO tasks (url, task_type, reward, total_needed, completed_count, status, created_at)
+            VALUES (?, ?, ?, ?, 0, 1, ?)
+        """, (url, ttype, reward, total_needed, created_at))
+        
+        conn.commit()
+        return uid, url
+
+def reject_campaign(campaign_id):
+    """CRIT-03 FIX: This function was called in admin_handlers but did not exist."""
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT user_id FROM user_campaigns WHERE id = ?", (campaign_id,))
+        res = cursor.fetchone()
+        if not res:
+            return None
+        user_id = res[0]
+        cursor.execute("UPDATE user_campaigns SET status = 'rejected' WHERE id = ?", (campaign_id,))
+        conn.commit()
+        return user_id
 
 def get_user(user_id):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
-    user = cursor.fetchone()
-    conn.close()
-    return user
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
+        return cursor.fetchone()
 
 def register_user(user_id, username, referred_by=None, initial_points=10):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    
-    # Check if user already exists
-    if get_user(user_id):
-        conn.close()
-        return False
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
         
-    joined_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cursor.execute("""
-        INSERT INTO users (user_id, username, points, referred_by, joined_at)
-        VALUES (?, ?, ?, ?, ?)
-    """, (user_id, username, initial_points, referred_by, joined_at))
-    
-    conn.commit()
-    conn.close()
-    return True
+        # Check if user already exists
+        cursor.execute("SELECT user_id FROM users WHERE user_id = ?", (user_id,))
+        if cursor.fetchone():
+            return False
+            
+        joined_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("""
+            INSERT INTO users (user_id, username, points, referred_by, joined_at)
+            VALUES (?, ?, ?, ?, ?)
+        """, (user_id, username, initial_points, referred_by, joined_at))
+        
+        conn.commit()
+        return True
 
 def add_points(user_id, points):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("UPDATE users SET points = points + ? WHERE user_id = ?", (points, user_id))
-    conn.commit()
-    conn.close()
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET points = points + ? WHERE user_id = ?", (points, user_id))
+        conn.commit()
 
 def deduct_points(user_id, points):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("UPDATE users SET points = points - ? WHERE user_id = ?", (points, user_id))
-    conn.commit()
-    conn.close()
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET points = points - ? WHERE user_id = ?", (points, user_id))
+        conn.commit()
 
 def can_claim_daily(user_id):
     user = get_user(user_id)
@@ -474,238 +460,226 @@ def can_claim_daily(user_id):
     return time_diff >= timedelta(hours=24)
 
 def update_daily_claim(user_id):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cursor.execute("UPDATE users SET last_daily = ? WHERE user_id = ?", (now, user_id))
-    conn.commit()
-    conn.close()
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("UPDATE users SET last_daily = ? WHERE user_id = ?", (now, user_id))
+        conn.commit()
 
 def get_all_users():
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT user_id FROM users")
-    users = cursor.fetchall()
-    conn.close()
-    return [u[0] for u in users]
+    # HIGH-01 FIX: Use context manager to prevent connection leaks during broadcast
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT user_id FROM users WHERE is_banned = 0")
+        return [u[0] for u in cursor.fetchall()]
+
+def get_active_task_count():
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM tasks WHERE status = 1 AND completed_count < total_needed")
+        return cursor.fetchone()[0]
 
 def get_stats():
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*), SUM(points) FROM users")
-    stats = cursor.fetchone()
-    conn.close()
-    return stats
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*), SUM(points) FROM users")
+        res = cursor.fetchone()
+        # REM-02 FIX: SUM(points) returns NULL (Python None) if table is empty.
+        # Return 0 instead to avoid 'None' showing in user-facing messages.
+        total_users = res[0] if res[0] else 0
+        total_points = res[1] if res[1] else 0
+        return total_users, total_points
 
 # --- TASK MANAGEMENT FUNCTIONS ---
 
 def add_task(url, task_type, reward, total_needed):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cursor.execute("""
-        INSERT INTO tasks (url, task_type, reward, total_needed, completed_count, status, created_at)
-        VALUES (?, ?, ?, ?, 0, 1, ?)
-    """, (url, task_type, reward, total_needed, created_at))
-    conn.commit()
-    conn.close()
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("""
+            INSERT INTO tasks (url, task_type, reward, total_needed, completed_count, status, created_at)
+            VALUES (?, ?, ?, ?, 0, 1, ?)
+        """, (url, task_type, reward, total_needed, created_at))
+        conn.commit()
 
 def get_available_tasks(user_id):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    # Get active tasks that:
-    # 1. Have status = 1
-    # 2. Haven't reached their completion limit
-    # 3. User hasn't already submitted proof for (regardless of pending/approved/rejected)
-    cursor.execute("""
-        SELECT * FROM tasks 
-        WHERE status = 1 
-        AND completed_count < total_needed
-        AND id NOT IN (SELECT task_id FROM user_tasks WHERE user_id = ?)
-    """, (user_id,))
-    tasks = cursor.fetchall()
-    conn.close()
-    return tasks
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT * FROM tasks 
+            WHERE status = 1 
+            AND completed_count < total_needed
+            AND id NOT IN (SELECT task_id FROM user_tasks WHERE user_id = ?)
+        """, (user_id,))
+        return cursor.fetchall()
 
 def get_task_by_id(task_id):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
-    task = cursor.fetchone()
-    conn.close()
-    return task
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
+        return cursor.fetchone()
 
 def submit_proof(user_id, task_id, screenshot_id, screenshot_unique_id):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    # 1. Check if user already submitted for this task
-    cursor.execute("SELECT id FROM user_tasks WHERE user_id = ? AND task_id = ?", (user_id, task_id))
-    if cursor.fetchone():
-        conn.close()
-        return "ALREADY_SUBMITTED"
-    
-    # 2. Check if this exact photo was used before by ANYONE (Anti-Fraud)
-    cursor.execute("SELECT id FROM user_tasks WHERE screenshot_unique_id = ?", (screenshot_unique_id,))
-    if cursor.fetchone():
-        conn.close()
-        return "DUPLICATE_PHOTO"
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        # 1. Check if user already submitted for this task
+        cursor.execute("SELECT id FROM user_tasks WHERE user_id = ? AND task_id = ?", (user_id, task_id))
+        if cursor.fetchone():
+            return "ALREADY_SUBMITTED"
         
-    submitted_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cursor.execute("""
-        INSERT INTO user_tasks (user_id, task_id, screenshot_id, screenshot_unique_id, submitted_at)
-        VALUES (?, ?, ?, ?, ?)
-    """, (user_id, task_id, screenshot_id, screenshot_unique_id, submitted_at))
-    sub_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
-    return sub_id
+        # 2. Check if this exact photo was used before by ANYONE (Anti-Fraud)
+        cursor.execute("SELECT id FROM user_tasks WHERE screenshot_unique_id = ?", (screenshot_unique_id,))
+        if cursor.fetchone():
+            return "DUPLICATE_PHOTO"
+            
+        submitted_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("""
+            INSERT INTO user_tasks (user_id, task_id, screenshot_id, screenshot_unique_id, submitted_at)
+            VALUES (?, ?, ?, ?, ?)
+        """, (user_id, task_id, screenshot_id, screenshot_unique_id, submitted_at))
+        sub_id = cursor.lastrowid
+        conn.commit()
+        return sub_id
 
 def approve_submission(submission_id):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    
-    # Get submission details
-    cursor.execute("SELECT user_id, task_id FROM user_tasks WHERE id = ?", (submission_id,))
-    res = cursor.fetchone()
-    if not res:
-        conn.close()
-        return False
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
         
-    user_id, task_id = res
-    
-    # Get reward amount
-    cursor.execute("SELECT reward FROM tasks WHERE id = ?", (task_id,))
-    reward_res = cursor.fetchone()
-    if not reward_res:
-        conn.close()
-        return False
-    reward = reward_res[0]
-    
-    # Update status to approved
-    cursor.execute("UPDATE user_tasks SET status = 'approved' WHERE id = ?", (submission_id,))
-    # Add points to user
-    cursor.execute("UPDATE users SET points = points + ? WHERE user_id = ?", (reward, user_id))
-    # Increment completed_count in tasks
-    cursor.execute("UPDATE tasks SET completed_count = completed_count + 1 WHERE id = ?", (task_id,))
-    
-    conn.commit()
-    conn.close()
-    return user_id, reward
+        # Get submission details
+        cursor.execute("SELECT user_id, task_id FROM user_tasks WHERE id = ?", (submission_id,))
+        res = cursor.fetchone()
+        if not res:
+            return False
+            
+        user_id, task_id = res
+        
+        # Get reward amount
+        cursor.execute("SELECT reward FROM tasks WHERE id = ?", (task_id,))
+        reward_res = cursor.fetchone()
+        if not reward_res:
+            return False
+        reward = reward_res[0]
+        
+        # Update status to approved
+        cursor.execute("UPDATE user_tasks SET status = 'approved' WHERE id = ?", (submission_id,))
+        # Add points to user
+        cursor.execute("UPDATE users SET points = points + ? WHERE user_id = ?", (reward, user_id))
+        # Increment completed_count in tasks
+        cursor.execute("UPDATE tasks SET completed_count = completed_count + 1 WHERE id = ?", (task_id,))
+        
+        conn.commit()
+        return user_id, reward
 
 def reject_submission(submission_id):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    
-    # Get user_id for notification
-    cursor.execute("SELECT user_id FROM user_tasks WHERE id = ?", (submission_id,))
-    res = cursor.fetchone()
-    if not res:
-        conn.close()
-        return False
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
         
-    user_id = res[0]
-    
-    # Update status to rejected
-    cursor.execute("UPDATE user_tasks SET status = 'rejected' WHERE id = ?", (submission_id,))
-    conn.commit()
-    conn.close()
-    return user_id
+        # Get user_id for notification
+        cursor.execute("SELECT user_id FROM user_tasks WHERE id = ?", (submission_id,))
+        res = cursor.fetchone()
+        if not res:
+            return False
+            
+        user_id = res[0]
+        
+        # Update status to rejected
+        cursor.execute("UPDATE user_tasks SET status = 'rejected' WHERE id = ?", (submission_id,))
+        conn.commit()
+        return user_id
 
 def get_submission_by_id(submission_id):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM user_tasks WHERE id = ?", (submission_id,))
-    sub = cursor.fetchone()
-    conn.close()
-    return sub
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM user_tasks WHERE id = ?", (submission_id,))
+        return cursor.fetchone()
 
 # --- WITHDRAWAL FUNCTIONS ---
 
 def add_withdrawal_request(user_id, amount, method, details):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    # Check if user has enough points
-    cursor.execute("SELECT points FROM users WHERE user_id = ?", (user_id,))
-    res = cursor.fetchone()
-    if not res or res[0] < amount:
-        conn.close()
-        return False
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        # Check if user has enough points
+        cursor.execute("SELECT points FROM users WHERE user_id = ?", (user_id,))
+        res = cursor.fetchone()
+        if not res or res[0] < amount:
+            return False
+            
+        # Deduct points immediately (pending)
+        cursor.execute("UPDATE users SET points = points - ? WHERE user_id = ?", (amount, user_id))
         
-    # Deduct points immediately (pending)
-    cursor.execute("UPDATE users SET points = points - ? WHERE user_id = ?", (amount, user_id))
-    
-    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cursor.execute("""
-        INSERT INTO withdrawals (user_id, amount, method, details, status, created_at)
-        VALUES (?, ?, ?, ?, 'pending', ?)
-    """, (user_id, amount, method, details, created_at))
-    
-    conn.commit()
-    conn.close()
-    return True
+        created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("""
+            INSERT INTO withdrawals (user_id, amount, method, details, status, created_at)
+            VALUES (?, ?, ?, ?, 'pending', ?)
+        """, (user_id, amount, method, details, created_at))
+        
+        conn.commit()
+        return True
+
+def get_last_withdrawal_id(user_id):
+    """Returns the most recently inserted withdrawal ID for a user."""
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM withdrawals WHERE user_id = ? ORDER BY id DESC LIMIT 1", (user_id,))
+        res = cursor.fetchone()
+        return res[0] if res else None
 
 def get_withdrawal_by_id(withdrawal_id):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM withdrawals WHERE id = ?", (withdrawal_id,))
-    withd = cursor.fetchone()
-    conn.close()
-    return withd
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM withdrawals WHERE id = ?", (withdrawal_id,))
+        return cursor.fetchone()
 
 def approve_withdrawal(withdrawal_id):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("UPDATE withdrawals SET status = 'approved' WHERE id = ?", (withdrawal_id,))
-    cursor.execute("SELECT user_id, amount FROM withdrawals WHERE id = ?", (withdrawal_id,))
-    res = cursor.fetchone()
-    conn.commit()
-    conn.close()
-    return res
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        # REM-03 FIX: Fetch FIRST to verify record exists, THEN update.
+        # Previous order was reversed: update ran even if ID was invalid.
+        cursor.execute("SELECT user_id, amount FROM withdrawals WHERE id = ?", (withdrawal_id,))
+        res = cursor.fetchone()
+        if not res:
+            return None
+        cursor.execute("UPDATE withdrawals SET status = 'approved' WHERE id = ?", (withdrawal_id,))
+        conn.commit()
+        return res
 
 def reject_withdrawal(withdrawal_id):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    
-    # Get details for refund
-    cursor.execute("SELECT user_id, amount FROM withdrawals WHERE id = ?", (withdrawal_id,))
-    res = cursor.fetchone()
-    if not res:
-        conn.close()
-        return False
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
         
-    user_id, amount = res
-    
-    # Update status to rejected
-    cursor.execute("UPDATE withdrawals SET status = 'rejected' WHERE id = ?", (withdrawal_id,))
-    # Refund points
-    cursor.execute("UPDATE users SET points = points + ? WHERE user_id = ?", (amount, user_id))
-    
-    conn.commit()
-    conn.close()
-    return user_id, amount
+        # Get details for refund
+        cursor.execute("SELECT user_id, amount FROM withdrawals WHERE id = ?", (withdrawal_id,))
+        res = cursor.fetchone()
+        if not res:
+            return False
+            
+        user_id, amount = res
+        
+        # Update status to rejected
+        cursor.execute("UPDATE withdrawals SET status = 'rejected' WHERE id = ?", (withdrawal_id,))
+        # Refund points
+        cursor.execute("UPDATE users SET points = points + ? WHERE user_id = ?", (amount, user_id))
+        
+        conn.commit()
+        return user_id, amount
 
 def get_pending_counts():
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM user_tasks WHERE status = 'pending'")
-    task_count = cursor.fetchone()[0]
-    cursor.execute("SELECT COUNT(*) FROM withdrawals WHERE status = 'pending'")
-    withd_count = cursor.fetchone()[0]
-    conn.close()
-    return task_count, withd_count
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM user_tasks WHERE status = 'pending'")
+        task_count = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM withdrawals WHERE status = 'pending'")
+        withd_count = cursor.fetchone()[0]
+        return task_count, withd_count
 
 def get_next_pending_task():
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM user_tasks WHERE status = 'pending' ORDER BY id ASC LIMIT 1")
-    task = cursor.fetchone()
-    conn.close()
-    return task
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM user_tasks WHERE status = 'pending' ORDER BY id ASC LIMIT 1")
+        return cursor.fetchone()
 
 def get_next_pending_withdrawal():
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM withdrawals WHERE status = 'pending' ORDER BY id ASC LIMIT 1")
-    withd = cursor.fetchone()
-    conn.close()
-    return withd
+    with get_db_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM withdrawals WHERE status = 'pending' ORDER BY id ASC LIMIT 1")
+        return cursor.fetchone()

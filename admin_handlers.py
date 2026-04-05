@@ -19,13 +19,23 @@ async def pending_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton(f"💰 مراجعة السحوبات ({withd_count})", callback_data="rev_withd")]
     ]
     
-    await update.message.reply_text(
-        get_str(update.effective_user.id, 'ADMIN_PENDING_MSG').format(task_count=task_count, withd_count=withd_count),
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="Markdown"
-    )
+    msg = get_str(update.effective_user.id, 'ADMIN_PENDING_MSG').format(task_count=task_count, withd_count=withd_count)
+    
+    # CRIT-01 FIX: pending_dashboard is called as a CallbackQueryHandler, so use query.
+    # It can also be called directly from a message, so handle both cases.
+    if update.callback_query:
+        await update.callback_query.answer()
+        await update.callback_query.edit_message_text(
+            msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown"
+        )
+    else:
+        await update.message.reply_text(
+            msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown"
+        )
 
 async def review_tasks_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != c.ADMIN_ID:
+        return
     query = update.callback_query
     await query.answer()
     
@@ -55,6 +65,8 @@ async def review_tasks_callback(update: Update, context: ContextTypes.DEFAULT_TY
     )
 
 async def review_withd_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != c.ADMIN_ID:
+        return
     query = update.callback_query
     await query.answer()
     
@@ -80,6 +92,8 @@ async def review_withd_callback(update: Update, context: ContextTypes.DEFAULT_TY
     )
 
 async def withdraw_approve_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != c.ADMIN_ID:
+        return
     query = update.callback_query
     await query.answer()
     
@@ -97,6 +111,8 @@ async def withdraw_approve_callback(update: Update, context: ContextTypes.DEFAUL
         await query.edit_message_text("❌ **خطأ في المعالجة.**")
 
 async def withdraw_reject_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != c.ADMIN_ID:
+        return
     query = update.callback_query
     await query.answer()
     
@@ -113,38 +129,19 @@ async def withdraw_reject_callback(update: Update, context: ContextTypes.DEFAULT
     else:
         await query.edit_message_text("❌ **خطأ في المعالجة.**")
 
-async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def stats_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != c.ADMIN_ID:
         return
+    query = update.callback_query
+    await query.answer()
     
     total_users, total_points = db.get_stats()
-    await update.message.reply_text(
-        get_str(update.effective_user.id, 'STATS_MSG').format(total_users=total_users, total_points=total_points),
-        parse_mode="Markdown"
+    task_count = db.get_active_task_count()
+    await query.edit_message_text(
+        get_str(update.effective_user.id, 'STATS_MSG', total_users=total_users, total_points=total_points, task_count=task_count),
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 عودة", callback_data="admin_main")]])
     )
-
-async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != c.ADMIN_ID:
-        return
-    
-    if not context.args:
-        await update.message.reply_text("👮 **استخدام:** `/broadcast [الرسالة]`", parse_mode="Markdown")
-        return
-    
-    message = " ".join(context.args)
-    all_users = db.get_all_users()
-    
-    await update.message.reply_text("📢 **جاري بدء الإرسال الجماعي...**", parse_mode="Markdown")
-    
-    count = 0
-    for user_id in all_users:
-        try:
-            await context.bot.send_message(user_id, message)
-            count += 1
-        except:
-            pass
-            
-    await update.message.reply_text(f"✅ **تم إرسال الرسالة إلى {count} مستخدم!**", parse_mode="Markdown")
 
 async def add_points_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != c.ADMIN_ID:
@@ -210,10 +207,13 @@ async def admin_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     )
 
 async def admin_setting_edit_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # CRIT-05 FIX: Add mandatory ADMIN_ID security check
+    if update.effective_user.id != c.ADMIN_ID:
+        return
     query = update.callback_query
     await query.answer()
     
-    setting_type = query.data # e.g., "set_usdt_start"
+    setting_type = query.data  # e.g., "set_usdt_start"
     context.user_data['awaiting_admin_setting'] = setting_type
     
     labels = {
@@ -258,7 +258,11 @@ async def admin_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != c.ADMIN_ID:
         return
         
-    text = "👮 **لوحة تحكم المدير - النظام العالمي**\n\nمرحباً بك! اختر القسم الذي تود إدارته:"
+    user_id = update.effective_user.id
+    total_users, total_points = db.get_stats()
+    
+    # We use ADMIN_DASHBOARD_OVERVIEW from strings.py
+    text = get_str(user_id, 'ADMIN_DASHBOARD_OVERVIEW', total_users=total_users, total_points=total_points)
     
     # Check maintenance status
     m_mode = db.get_setting('maintenance_mode', 'off')
@@ -267,9 +271,9 @@ async def admin_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if update.callback_query:
         await update.callback_query.answer()
-        await update.callback_query.edit_message_text(text, reply_markup=admin_buttons_keyboard(), parse_mode="Markdown")
+        await update.callback_query.edit_message_text(text, reply_markup=await admin_buttons_keyboard(), parse_mode="Markdown")
     else:
-        await update.message.reply_text(text, reply_markup=admin_buttons_keyboard(), parse_mode="Markdown")
+        await update.message.reply_text(text, reply_markup=await admin_buttons_keyboard(), parse_mode="Markdown")
 
 async def admin_buttons_keyboard():
     m_mode = db.get_setting('maintenance_mode', 'off')
@@ -299,40 +303,7 @@ async def admin_add_package_start(update: Update, context: ContextTypes.DEFAULT_
         parse_mode="Markdown"
     )
 
-async def admin_broadcast_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    await query.edit_message_text("📢 **من فضلك أرسل الرسالة التي تود توجيهها للكل الآن:**\n(أو اكتب /cancel للإلغاء)")
-    context.user_data['admin_action'] = 'broadcasting'
 
-async def stats_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    
-    total_users, total_points = db.get_stats()
-    keyboard = [[InlineKeyboardButton("🔙 العودة", callback_data="admin_main")]]
-    await query.edit_message_text(
-        get_str(c.ADMIN_ID, 'STATS_MSG').format(total_users=total_users, total_points=total_points),
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="Markdown"
-    )
-
-async def admin_logs_view_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    
-    logs = db.get_admin_logs(15)
-    if not logs:
-        msg = "📜 **سجل التدقيق فارغ حالياً.**"
-    else:
-        msg = "📜 **آخر عمليات التدقيق (الأمن):**\n\n"
-        for l in logs:
-            # l: (id, admin_id, action, target_id, time)
-            target = f" للمستخدم `{l[3]}`" if l[3] else ""
-            msg += f"🔹 {l[4].split(' ')[1]} | {l[2]}{target}\n"
-            
-    keyboard = [[InlineKeyboardButton("🔙 العودة", callback_data="admin_main")]]
-    await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
 # --- SECURITY COMMANDS ---
 
@@ -382,6 +353,8 @@ async def add_task_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # --- PROOF REVIEW ---
 
 async def approve_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != c.ADMIN_ID:
+        return
     query = update.callback_query
     await query.answer()
     
@@ -403,20 +376,28 @@ async def approve_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 db.add_points(user_id, extra)
         
         db.log_admin_action(c.ADMIN_ID, "APPROVE_TASK", user_id)
-        await query.edit_message_caption(get_str(c.ADMIN_ID, 'APPROVE_SUCCESS').format(reward=final_reward) if 'APPROVE_SUCCESS' in s.STRINGS['ar'] else f"✅ Approved! {final_reward} points added.", parse_mode="Markdown")
+        # IMP-02 FIX: APPROVE_SUCCESS now exists in strings.py, use it directly
+        await query.edit_message_caption(
+            get_str(c.ADMIN_ID, 'APPROVE_SUCCESS').format(reward=final_reward),
+            parse_mode="Markdown"
+        )
         
-        # Notify user
+        # Notify user with localized message
         try:
-            msg = f"✅ **تهانينا!** تمت الموافقة على الإثبات وتم إضافة **{final_reward}** نقطة لرصيدك."
+            lang = db.get_user_lang(user_id)
+            msg = s.STRINGS[lang]['AI_AUTO_APPROVED'].format(reward=final_reward)
             if final_reward > base_reward:
-                msg += f"\n💎 (بما في ذلك مكافأة الـ VIP بمقدار {final_reward - base_reward} نقطة!)"
+                vip_extra = final_reward - base_reward
+                msg += f"\n💎 (+{vip_extra} VIP Bonus!)"
             await context.bot.send_message(user_id, msg, parse_mode="Markdown")
-        except:
+        except Exception:
             pass
     else:
         await query.edit_message_caption("❌ **خطأ في معالجة الموافقة.**")
 
 async def reject_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != c.ADMIN_ID:
+        return
     query = update.callback_query
     await query.answer()
     
@@ -433,6 +414,8 @@ async def reject_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def final_reject_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != c.ADMIN_ID:
+        return
     query = update.callback_query
     await query.answer()
     
@@ -497,6 +480,8 @@ async def add_package_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # --- DEPOSIT REVIEW ---
 
 async def review_deposits_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != c.ADMIN_ID:
+        return
     query = update.callback_query
     await query.answer()
     
@@ -526,6 +511,8 @@ async def review_deposits_callback(update: Update, context: ContextTypes.DEFAULT
     )
 
 async def deposit_approve_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != c.ADMIN_ID:
+        return
     query = update.callback_query
     await query.answer()
     
@@ -534,17 +521,21 @@ async def deposit_approve_callback(update: Update, context: ContextTypes.DEFAULT
     
     if res:
         u_id, pts = res
-        await query.edit_message_text(f"✅ **تم شحن {pts} نقطة للمستخدم {u_id}!**")
+        # HIGH-03 FIX: DB operations must happen OUTSIDE the try block so they
+        # always execute even if the Telegram notification to user fails.
+        db.log_transaction(u_id, pts, "DEPOSIT", f"شراء باقة نقاط ({pts} نقطة)")
+        db.log_admin_action(c.ADMIN_ID, "APPROVE_DEPOSIT", u_id)
+        await query.edit_message_caption(f"✅ **تم شحن {pts} نقطة للمستخدم {u_id}!**", parse_mode="Markdown")
         try:
-            await context.bot.send_message(u_id, f"✅ **تم تأكيد عملية الدفع!**\nلقد أضفنا **{pts}** نقطة إلى رصيدك. تسوق ممتع! 🛒")
-            db.log_transaction(u_id, pts, "DEPOSIT", f"شراء باقة نقاط ({pts} نقطة)")
-            db.log_admin_action(c.ADMIN_ID, "APPROVE_DEPOSIT", u_id)
-        except:
+            await context.bot.send_message(u_id, f"✅ **تم تأكيد عملية الدفع!**\nلقد أضفنا **{pts}** نقطة إلى رصيدك. تسوق ممتع! 🛒", parse_mode="Markdown")
+        except Exception:
             pass
     else:
         await query.edit_message_text("❌ **خطأ في المعالجة.**")
 
 async def deposit_reject_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != c.ADMIN_ID:
+        return
     query = update.callback_query
     await query.answer()
     
@@ -554,18 +545,20 @@ async def deposit_reject_callback(update: Update, context: ContextTypes.DEFAULT_
     user_id = db.reject_deposit(d_id)
     
     if user_id:
-        await query.edit_message_text("❌ **تم رفض طلب الشحن.**")
+        await query.edit_message_caption("❌ **تم رفض طلب الشحن.**")
         try:
             await context.bot.send_message(user_id, get_str(user_id, 'DEPOSIT_REJECT_USER'), parse_mode="Markdown")
             db.log_admin_action(c.ADMIN_ID, "REJECT_DEPOSIT", user_id)
         except:
             pass
     else:
-        await query.edit_message_text("❌ **خطأ في المعالجة.**")
+        await query.edit_message_caption("❌ **خطأ في المعالجة.**")
 
 # --- CAMPAIGN REVIEW ---
 
 async def review_campaigns_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != c.ADMIN_ID:
+        return
     query = update.callback_query
     await query.answer()
     
@@ -591,6 +584,8 @@ async def review_campaigns_callback(update: Update, context: ContextTypes.DEFAUL
     )
 
 async def campaign_approve_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != c.ADMIN_ID:
+        return
     query = update.callback_query
     await query.answer()
     
@@ -608,6 +603,8 @@ async def campaign_approve_callback(update: Update, context: ContextTypes.DEFAUL
         await query.edit_message_text("❌ **خطأ في المعالجة.**")
 
 async def campaign_reject_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != c.ADMIN_ID:
+        return
     query = update.callback_query
     await query.answer()
     
@@ -627,6 +624,8 @@ async def campaign_reject_callback(update: Update, context: ContextTypes.DEFAULT
 # --- MAINTENANCE & REFRESH ---
 
 async def toggle_maintenance_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != c.ADMIN_ID:
+        return
     query = update.callback_query
     await query.answer()
     
@@ -638,6 +637,8 @@ async def toggle_maintenance_callback(update: Update, context: ContextTypes.DEFA
     await admin_main_menu(update, context)
 
 async def admin_refresh_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != c.ADMIN_ID:
+        return
     query = update.callback_query
     await query.answer()
     
@@ -653,6 +654,8 @@ async def admin_refresh_callback(update: Update, context: ContextTypes.DEFAULT_T
     os._exit(0)
 
 async def admin_backup_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != c.ADMIN_ID:
+        return
     query = update.callback_query
     await query.answer()
     
@@ -673,18 +676,68 @@ async def admin_backup_callback(update: Update, context: ContextTypes.DEFAULT_TY
     except Exception as e:
         await query.message.reply_text(f"❌ **خطأ أثناء النسخ الاحتياطي:** {str(e)}")
 
-# --- SUPPORT SYSTEM (REPLY) ---
-
-async def support_reply_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def admin_logs_view_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != c.ADMIN_ID:
+        return
     query = update.callback_query
     await query.answer()
     
-    target_user_id = query.data.split("_")[1]
+    # Export admin_logs to a professional .txt file
+    import io
+    logs = db.get_admin_logs(limit=50)
+    
+    if not logs:
+        await query.edit_message_text("📜 **سجل الأمان فارغ حالياً.**", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 عودة", callback_data="admin_main")]]))
+        return
+        
+    log_stream = io.StringIO()
+    log_stream.write("ADMIN SECURITY LOGS - EXPORT\n")
+    log_stream.write("="*30 + "\n\n")
+    for log in logs:
+        # log: (id, admin_id, action, target_id, timestamp)
+        log_stream.write(f"[{log[4]}] Action: {log[2]} | Target: {log[3]}\n")
+        
+    log_stream.seek(0)
+    # Convert to bytes for telegram
+    log_bytes = io.BytesIO(log_stream.getvalue().encode('utf-8'))
+    
+    await context.bot.send_document(
+        c.ADMIN_ID,
+        document=log_bytes,
+        filename=f"security_logs_{datetime.now().strftime('%Y%m%d')}.txt",
+        caption="📜 **إليك سجل الأمان الاحترافي للمنصة (آخر 50 عملية).**",
+        parse_mode="Markdown"
+    )
+
+async def admin_broadcast_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != c.ADMIN_ID:
+        return
+    query = update.callback_query
+    await query.answer()
+    
+    context.user_data['admin_action'] = 'broadcasting'
+    await query.edit_message_text(
+        "📢 **قسم الإرسال الجماعي الاحترافي**\n\n- أرسل الآن أي (صورة، فيديو، نص، ملف) ليتم تحويله فوراً لجميع المستخدمين.\n- التقنية المستخدمة تضمن وصول الرسالة بشكلها الأصلي.\n\n❌ للإلغاء، اكتب `/cancel`",
+        parse_mode="Markdown"
+    )
+
+# --- SUPPORT SYSTEM (REPLY) ---
+
+async def support_reply_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != c.ADMIN_ID:
+        return
+    query = update.callback_query
+    await query.answer()
+    
+    # CRIT-04 FIX: Store target_user_id as int to ensure correct type for send_message
+    target_user_id = int(query.data.split("_")[1])
     context.user_data['replyING_to'] = target_user_id
     
-    await query.message.reply_text(f"📝 **جاري الرد على المستخدم `{target_user_id}`**\nأرسل رسالتك الآن:")
+    await query.message.reply_text(f"📝 **جاري الرد على المستخدم `{target_user_id}`**\nأرسل رسالتك الآن:", parse_mode="Markdown")
 
 async def handle_support_reply_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != c.ADMIN_ID:
+        return
     target_uid = context.user_data.get('replyING_to')
     if not target_uid:
         return
@@ -702,3 +755,52 @@ async def handle_support_reply_text(update: Update, context: ContextTypes.DEFAUL
         await update.message.reply_text("❌ **فشل إرسال الرد. قد يكون المستخدم حظر البوت.**")
         
     del context.user_data['replyING_to']
+
+async def handle_broadcast_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    NEW: Professional Media Broadcast Handler.
+    This function catches any message from the admin when 'admin_action' is 'broadcasting'.
+    It uses copy_message to broadcast any message type (text, photo, video, etc.)
+    while preserving captions and formatting without 'Forwarded' tag.
+    """
+    if update.effective_user.id != c.ADMIN_ID:
+        return False
+        
+    if context.user_data.get('admin_action') != 'broadcasting':
+        return False
+        
+    if update.message.text == '/cancel':
+        del context.user_data['admin_action']
+        await update.message.reply_text(get_str(c.ADMIN_ID, 'BROADCAST_CANCELLED'))
+        return True
+        
+    # Start Broadcasting
+    del context.user_data['admin_action']
+    all_users = db.get_all_users()
+    
+    status_msg = await update.message.reply_text(get_str(c.ADMIN_ID, 'BROADCAST_STARTED'), parse_mode="Markdown")
+    
+    count = 0
+    failed = 0
+    for uid in all_users:
+        try:
+            # copy_message preserves captions, formatting, and buttons
+            await context.bot.copy_message(
+                chat_id=uid,
+                from_chat_id=update.message.chat_id,
+                message_id=update.message.message_id
+            )
+            count += 1
+            # Add small delay to avoid hitting rate limits if user list is huge
+            import asyncio
+            if count % 25 == 0:
+                await asyncio.sleep(0.5)
+        except Exception:
+            failed += 1
+            
+    await status_msg.edit_text(
+        get_str(c.ADMIN_ID, 'BROADCAST_COMPLETED', count=count, failed=failed),
+        parse_mode="Markdown"
+    )
+    db.log_admin_action(c.ADMIN_ID, "BROADCAST_ALL", count)
+    return True

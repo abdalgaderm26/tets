@@ -82,11 +82,13 @@ async def process_promo_text(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 db.log_transaction(user_id, -budget, "PROMOTION", f"طلب ترويج لحساب: {url}")
                 await update.message.reply_text(get_str(user_id, 'PROMO_SUCCESS'), parse_mode="Markdown")
                 # Notify Admin
-                await context.bot.send_message(c.ADMIN_ID, f"🚀 **طلب ترويج جديد للمراجعة!**\nالمستخدم: `{user_id}`\nالرابط: {url}", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📋 مراجعة الترويجات", callback_data="rev_campaigns")]]))
+                await context.bot.send_message(c.ADMIN_ID, f"🚀 **طلب ترويج جديد للمراجعة!**\nالمستخدم: `{user_id}`\nالرابط: {url}", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📋 مراجعة الترويجات", callback_data="rev_campaigns")]]), parse_mode="Markdown")
             else:
                 await update.message.reply_text("❌ **فشل في إنشاء الحملة.**")
                 
-            del context.user_data['promo_step']
+            # MED-04 FIX: Clean ALL promo state keys, not just promo_step
+            for key in ['promo_step', 'promo_url', 'promo_budget', 'promo_reward']:
+                context.user_data.pop(key, None)
             return True
         except ValueError:
             await update.message.reply_text("❌ **أدخل رقماً صحيحاً.**")

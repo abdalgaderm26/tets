@@ -33,7 +33,6 @@ STRINGS = {
         'MAINTENANCE_MSG': "🛠️ **نحن في صيانة حالياً!**\n\nنقوم ببعض التحديثات المهمة لجعل تجربتكم أفضل. سنعود للعمل قريباً جداً. شكراً لصبركم! 🙏",
         'BACKUP_SUCCESS': "💾 **تم استخراج نسخة احتياطية من قاعدة البيانات بنجاح.**",
         'REFRESH_MSG': "🔄 **جاري تحديث النظام...**\nسيتم إعادة تشغيل البوت الآن لتطبيق التعديلات.",
-        'STATS_MSG': "📊 **إحصائيات المنصة**\n\n👥 إجمالي المستخدمين: `{total_users}`\n💰 إجمالي النقاط المتداولة: `{total_points}`",
         'DUPLICATE_PHOTO_ERROR': "❌ **هذا الإثبات تم استخدامه من قبل!** يرجى إرسال إثبات جديد وحقيقي.",
         'AI_VERIFYING': "🔍 **جاري فحص الإثبات بالذكاء الاصطناعي...**",
         'AI_AUTO_APPROVED': "✅ **تمت الموافقة التلقائية!** لقد حصلت على **{reward}** نقطة.",
@@ -55,17 +54,25 @@ STRINGS = {
         'TASK_POINTS_LABEL': "نقطة",
         'TASKS_EMPTY': "✨ **لا توجد مهام متاحة حالياً. تفقدنا لاحقاً!**",
         'ADMIN_PENDING_MSG': "📊 **الملخص الإداري**\n\n📸 مهام معلقة: `{task_count}`\n💰 سحوبات معلقة: `{withd_count}`",
+        'ADMIN_DASHBOARD_OVERVIEW': "👮 **لوحة تحكم المدير - النظام العالمي**\n\n📈 إجمالي المستخدمين: `{total_users}`\n💰 إجمالي النقاط في النظام: `{total_points}`\n\nمرحباً بك! اختر القسم الذي تود إدارته:",
+        'STATS_MSG': "📊 **إحصائيات المنصة الحقيقية**\n\n👥 عدد المشتركين: `{total_users}`\n💰 النقاط الموزعة: `{total_points}`\n🚀 المهام النشطة: `{task_count}`",
         'NEW_SUBMISSION_MSG': "📥 **إثبات جديد!**\n👤 المستخدم: `{user_id}`\n🔗 الرابط: {url}\n🎁 الجائزة: {reward}",
         'REJECT_SUCCESS': "❌ **تم رفض الإثبات وإرسال السبب للمستخدم.**",
         'REJECT_REPLY_USER': "❌ **عذراً! تم رفض إثباتك.**\nالسبب: {reason}\nيرجى المحاولة مرة أخرى بشكل صحيح.",
+        'APPROVE_SUCCESS': "✅ **تمت الموافقة وأُضيفت **{reward}** نقطة للمستخدم.**",
+        'ALREADY_SUBMITTED_ERROR': "❌ **لقد أرسلت إثباتاً لهذه المهمة مسبقاً!** انتظر المراجعة.",
         'REJECT_REASONS': {
             'wrong_link': "❌ رابط خاطئ\nلقد أرسلت إثباتاً لمهمة مختلفة أو رابطاً غير صحيح.",
             'low_quality': "📸 جودة ضعيفة\nلقد أرسلت صورة غير واضحة لا تظهر التنفيذ.",
             'not_done': "🚫 لم يتم البدء\nالصورة لا تظهر أنك قمت بالمتابعة أو الإعجاب فعلياً.",
             'fake': "⚠️ إثبات مزيف\nالصورة معدلة أو مزيفة، يرجى الالتزام بالأمانة."
-        }
+        },
+        'BROADCAST_STARTED': "📢 **جاري بدء الإرسال الجماعي لجميع المستخدمين...**\nيرجى الانتظار، قد يستغرق هذا وقتاً طويلاً.",
+        'BROADCAST_COMPLETED': "✅ **اكتمل الإرسال الجماعي!**\n\n🔹 تم الإرسال بنجاح: `{count}`\n🔸 فشل (حظر أو خطأ): `{failed}`",
+        'BROADCAST_CANCELLED': "❌ تم إلغاء الإرسال الجماعي."
     },
     'en': {
+        'CHOOSE_LANGUAGE_MSG': "👋 **Welcome! Please choose your preferred language to start:**\n\nيرجى اختيار لغتك للمتابعة:",
         'START_MSG': "🌟 **Welcome to the Rewards Bot!** 🌟\n\nWe're glad to have you. You've received **10 points** as a welcome gift! 🎁\n\nUse the menu below to collect points and invite friends to earn more.",
         'PROFILE_MSG': "👤 **Your Profile Info**\n\n🆔 **User ID:** `{user_id}`\n💰 **Current Balance:** `{points}` Points\n📅 **Joined At:** `{joined_at}`\n💎 **Status:** {status}",
         'DAILY_SUCCESS': "✅ **Daily gift received!** You got **{amount}** points.",
@@ -96,8 +103,10 @@ STRINGS = {
         'MAINTENANCE_MSG': "🛠️ **System Maintenance!**\n\nWe are doing some important updates. We will be back online very soon. Thank you for your patience! 🙏",
         'BACKUP_SUCCESS': "💾 **Database backup generated successfully.**",
         'REFRESH_MSG': "🔄 **Updating system...**\nThe bot will restart now to apply changes.",
-        'STATS_MSG': "📊 **Platform Statistics**\n\n👥 Total Users: `{total_users}`\n💰 Total Points Circulating: `{total_points}`",
+        'STATS_MSG': "📊 **Live Platform Stats**\n\n👥 Total Users: `{total_users}`\n💰 Total Points Distributed: `{total_points}`\n🚀 Active Tasks: `{task_count}`",
         'DUPLICATE_PHOTO_ERROR': "❌ **This proof has been used before!** Please send a real, new proof.",
+        'APPROVE_SUCCESS': "✅ **Approved! {reward} points have been added to the user.**",
+        'ALREADY_SUBMITTED_ERROR': "❌ **You already submitted proof for this task!** Please wait for review.",
         'AI_VERIFYING': "🔍 **AI checking your proof...**",
         'AI_AUTO_APPROVED': "✅ **Auto-approved!** You earned **{reward}** points.",
         'WITHDRAW_FAILED_MIN': "❌ **Sorry!** Minimum withdrawal is {min_points} points.",
@@ -118,6 +127,8 @@ STRINGS = {
         'TASK_POINTS_LABEL': "Points",
         'TASKS_EMPTY': "✨ **No tasks available right now. Check back later!**",
         'ADMIN_PENDING_MSG': "📊 **Admin Overview**\n\n📸 Pending Tasks: `{task_count}`\n💰 Pending Withdrawals: `{withd_count}`",
+        'ADMIN_DASHBOARD_OVERVIEW': "👮 **Admin Dashboard - Global System**\n\n📈 Total Users: `{total_users}`\n💰 Total Points: `{total_points}`\n\nWelcome! Choose a section to manage:",
+        'STATS_MSG': "📊 **Live Platform Stats**\n\n👥 Total Users: `{total_users}`\n💰 Total Points Distributed: `{total_points}`\n🚀 Active Tasks: `{task_count}`",
         'NEW_SUBMISSION_MSG': "📥 **New Submission!**\n👤 User: `{user_id}`\n🔗 Link: {url}\n🎁 Reward: {reward}",
         'REJECT_SUCCESS': "❌ **Proof rejected and reason sent to user.**",
         'REJECT_REPLY_USER': "❌ **Sorry! Your proof was rejected.**\nReason: {reason}\nPlease try again correctly.",
@@ -126,6 +137,9 @@ STRINGS = {
             'low_quality': "📸 Low Quality\nThe screenshot is not clear enough to verify completion.",
             'not_done': "🚫 Not Completed\nThe screenshot doesn't show that you followed/liked the page.",
             'fake': "⚠️ Fake Proof\nThe screenshot appears edited or fake. Please be honest."
-        }
+        },
+        'BROADCAST_STARTED': "📢 **Starting global broadcast to all users...**\nPlease wait, this may take some time.",
+        'BROADCAST_COMPLETED': "✅ **Broadcast Completed!**\n\n🔹 Successfully sent: `{count}`\n🔸 Failed (Block or Error): `{failed}`",
+        'BROADCAST_CANCELLED': "❌ Broadcast cancelled."
     }
 }

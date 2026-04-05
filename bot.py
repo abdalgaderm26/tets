@@ -102,7 +102,9 @@ async def shop_currency_callback(update: Update, context: ContextTypes.DEFAULT_T
     user_id = update.effective_user.id
     await query.answer()
     
-    curr = query.data.split("_")[1]
+    # HIGH-05 FIX + REM-01 CLEANUP: Use prefix slice for robust currency extraction
+    # This handles any currency name, including ones with underscores
+    curr = query.data[len("buycurr_"):]
     packages = db.get_packages_by_currency(curr)
     
     keyboard = []
@@ -162,10 +164,13 @@ async def show_history(update: Update, context: ContextTypes.DEFAULT_TYPE):
     history_text = ""
     for t in txs:
         # t: (id, user_id, amount, type, description, created_at)
+        # MED-02 FIX: t[5] (created_at) can be None if migration occurred — guard it
+        raw_date = t[5] if t[5] else "N/A"
+        date_str = raw_date.split(" ")[0] if " " in raw_date else raw_date
         history_text += "• {type}: {pts} ({date})\n".format(
-            date=t[5].split(" ")[0],
+            date=date_str,
             type=t[3],
-            pts=f"+{t[2]}" if t[2] > 0 else t[2]
+            pts=f"+{t[2]}" if t[2] > 0 else str(t[2])
         )
         
     await update.message.reply_text(get_str(user_id, 'HISTORY_MSG').format(history=history_text), parse_mode="Markdown")
@@ -184,13 +189,29 @@ async def set_language_callback(update: Update, context: ContextTypes.DEFAULT_TY
     query = update.callback_query
     await query.answer()
     
-    lang = query.data.split("_")[1]
+    data = query.data.split("_")
+    lang = data[1]
+    is_onboarding = "onboard" in query.data
+    
     user_id = update.effective_user.id
     db.set_user_lang(user_id, lang)
     
-    msg = "✅ تم تحديث اللغة!" if lang == 'ar' else "✅ Language updated!"
-    await query.edit_message_text(msg)
-    await context.bot.send_message(user_id, get_str(user_id, 'START_MSG'), reply_markup=main_menu_keyboard(user_id), parse_mode="Markdown")
+    if is_onboarding:
+        # REM-04 FIX: Don't send START_MSG twice.
+        # Step 1: Edit the inline language picker to a brief confirmation.
+        # Step 2: Send ONE new message with the full welcome + keyboard.
+        confirm = "✅ تم اختيار اللغة!" if lang == 'ar' else "✅ Language set!"
+        await query.edit_message_text(confirm)
+        await context.bot.send_message(
+            user_id,
+            get_str(user_id, 'START_MSG'),
+            reply_markup=main_menu_keyboard(user_id),
+            parse_mode="Markdown"
+        )
+    else:
+        # For existing users changing settings
+        msg = "✅ تم تحديث اللغة!" if lang == 'ar' else "✅ Language updated!"
+        await query.edit_message_text(msg)
 
 # --- WITHDRAWAL FLOW ---
 async def start_withdraw(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -257,12 +278,8 @@ async def process_withdraw_text(update: Update, context: ContextTypes.DEFAULT_TY
         
         success = db.add_withdrawal_request(user_id, amount, method, text)
         if success:
-            # Notify Admin
-            conn = db.sqlite3.connect(db.DB_NAME)
-            cursor = conn.cursor()
-            cursor.execute("SELECT id FROM withdrawals WHERE user_id = ? ORDER BY id DESC LIMIT 1", (user_id,))
-            wth_id = cursor.fetchone()[0]
-            conn.close()
+            # BUG-02 FIX: Use the dedicated DB function instead of raw sqlite3 connection
+            wth_id = db.get_last_withdrawal_id(user_id)
             
             admin_kb = [
                 [InlineKeyboardButton("✅ موافقة", callback_data=f"wthappr_{wth_id}")],
@@ -278,10 +295,11 @@ async def process_withdraw_text(update: Update, context: ContextTypes.DEFAULT_TY
             
             await update.message.reply_text(get_str(user_id, 'WITHDRAW_SUCCESS'), parse_mode="Markdown")
         else:
-            await update.message.reply_text("❌ **فشل الطلب! تأكد من رصيدك.**")
+            await update.message.reply_text(get_str(user_id, 'WITHDRAW_FAILED_POINTS'), parse_mode="Markdown")
             
-        # Clean state
-        del context.user_data['wth_step']
+        # MED-03 FIX: Clean ALL withdraw state keys, not just wth_step
+        for key in ['wth_step', 'wth_method', 'wth_amount']:
+            context.user_data.pop(key, None)
         return True
         
     return False
@@ -308,11 +326,24 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except:
                 pass
 
-    await update.message.reply_text(
-        get_str(user.id, 'START_MSG'),
-        reply_markup=main_menu_keyboard(user.id),
-        parse_mode="Markdown"
-    )
+    if is_new:
+        # Show Language Picker First for professional onboarding
+        keyboard = [
+            [InlineKeyboardButton("العربية 🇸🇦", callback_data="setlang_ar_onboard"),
+             InlineKeyboardButton("English 🇺🇸", callback_data="setlang_en_onboard")]
+        ]
+        await update.message.reply_text(
+            # We use English/Arabic mixed prompt for the picker
+            "👋 **Welcome! Please choose your preferred language to start:**\n\nيرجى اختيار لغتك للمتابعة:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"
+        )
+    else:
+        await update.message.reply_text(
+            get_str(user.id, 'START_MSG'),
+            reply_markup=main_menu_keyboard(user.id),
+            parse_mode="Markdown"
+        )
 
 # --- PROFILE HANDLER ---
 async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -322,11 +353,24 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user_data:
         return
 
+    # BUG-08 FIX: users table columns:
+    # (0)user_id, (1)username, (2)points, (3)referred_by, (4)last_daily,
+    # (5)is_admin, (6)is_banned, (7)language, (8)vip_until, (9)joined_at
+    joined_at = user_data[9] if user_data[9] else 'N/A'
+    
+    # BUG-09 FIX: PROFILE_MSG uses {status} — must be passed
+    lang = db.get_user_lang(user_id)
+    if db.is_vip(user_id):
+        status = "💎 VIP" if lang == 'ar' else "💎 VIP Member"
+    else:
+        status = "👤 عادي" if lang == 'ar' else "👤 Regular"
+
     await update.message.reply_text(
         get_str(user_id, 'PROFILE_MSG').format(
             user_id=user_data[0],
             points=user_data[2],
-            joined_at=user_data[6]
+            joined_at=joined_at,
+            status=status
         ),
         parse_mode="Markdown"
     )
@@ -357,8 +401,10 @@ async def invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def public_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     total_users, total_points = db.get_stats()
+    task_count = db.get_active_task_count()
+    
     await update.message.reply_text(
-        get_str(user_id, 'STATS_MSG').format(total_users=total_users, total_points=total_points),
+        get_str(user_id, 'STATS_MSG', total_users=total_users, total_points=total_points, task_count=task_count),
         parse_mode="Markdown"
     )
 
@@ -367,7 +413,7 @@ async def show_all_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     tasks_list = db.get_available_tasks(user_id)
     
-    print(f"🔍 User {user_id} clicked Tasks. Found: {len(tasks_list)} tasks in DB.")
+    logger.info(f"🔍 User {user_id} clicked Tasks. Found: {len(tasks_list)} tasks in DB.")
     
     if not tasks_list:
         await update.effective_message.reply_text(get_str(user_id, 'TASKS_EMPTY'), parse_mode="Markdown")
@@ -413,18 +459,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
         
-    # Check if admin is broadcasting
-    if user_id == c.ADMIN_ID and context.user_data.get('admin_action') == 'broadcasting':
-        del context.user_data['admin_action']
-        all_users = db.get_all_users()
-        count = 0
-        for u in all_users:
-            try:
-                await context.bot.send_message(u[0], text, parse_mode="Markdown")
-                count += 1
-            except: pass
-        await update.message.reply_text(f"✅ تم الإرسال لـ {count} مستخدم.")
-        return
+    # NEW: Admin Global Actions (Broadcast/Support)
+    if user_id == c.ADMIN_ID:
+        if await admin.handle_broadcast_input(update, context):
+            return
+        if context.user_data.get('replyING_to'):
+            await admin.handle_support_reply_text(update, context)
+            return
 
     if await process_withdraw_text(update, context):
         return
@@ -432,32 +473,30 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if await promo.process_promo_text(update, context):
         return
 
-    if "مهام" in text or "Tasks" in text:
+    if "تنفيذ مهام" in text or text == "🚀 Tasks":
         await show_all_tasks(update, context)
-    elif "حسابي" in text or "Account" in text:
+    elif text in ("👤 حسابي", "👤 Account", "💰 رصيد", "💰 Balance"):
         await profile(update, context)
-    elif "رصيد" in text or "Balance" in text:
-        await profile(update, context)
-    elif "💎 VIP" in text or "VIP" in text:
+    elif text == "💎 VIP":
         await vip.start_vip_menu(update, context)
-    elif "الدعم" in text or "Support" in text:
+    elif "الدعم الفني" in text or text == "💬 Support":
         context.user_data['state'] = 'support_msg'
         await update.message.reply_text(get_str(user_id, 'SUPPORT_MSG'), parse_mode="Markdown")
-    elif "هدية يومية" in text or "Daily Gift" in text:
+    elif "هدية يومية" in text or text == "🎁 Daily Gift":
         await daily_gift(update, context)
-    elif "سحب الأرباح" in text or "Withdraw" in text:
+    elif "سحب الأرباح" in text or text == "💰 Withdraw":
         await start_withdraw(update, context)
-    elif "شراء نقاط" in text or "Buy Points" in text:
+    elif "شراء نقاط" in text or text == "🛒 Buy Points":
         await start_shop(update, context)
-    elif "ترويج" in text or "Promote" in text:
+    elif "ترويج" in text or text == "🚀 Promote":
         await promo.start_promo(update, context)
-    elif "السجل" in text or "History" in text:
+    elif "السجل" in text or text == "📜 History":
         await show_history(update, context)
-    elif "دعوة" in text or "Invite" in text:
+    elif "دعوة" in text or text == "👥 Invite":
         await invite(update, context)
-    elif "اللغة" in text or "Language" in text:
+    elif "اللغة" in text or text == "🌐 Language":
         await start_language_picker(update, context)
-    elif "الإحصائيات" in text or "Stats" in text:
+    elif "الإحصائيات" in text or text == "📊 Stats":
         await public_stats(update, context)
 
 # --- MAIN ---
@@ -486,16 +525,23 @@ def main():
     application.add_handler(CallbackQueryHandler(promo.promo_callback, pattern="^promo_"))
     
     # Message Handlers
-    async def merged_photo_handler(update, context):
+    async def merged_media_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await check_security(update, context):
             return
-        # Try shop deposit first
-        if await handle_deposit_proof(update, context):
-            return
-        # Otherwise standard task proof
-        await tasks.handle_proof(update, context)
+        # 1. Admin Broadcasting (Photos/Videos/etc.)
+        if update.effective_user.id == c.ADMIN_ID:
+            if await admin.handle_broadcast_input(update, context):
+                return
+        
+        # 2. Shop deposit (Photos)
+        if update.message.photo:
+            if await handle_deposit_proof(update, context):
+                return
+            # Standard task proof
+            await tasks.handle_proof(update, context)
 
-    application.add_handler(MessageHandler(filters.PHOTO, merged_photo_handler))
+    # Register generic media handler for all non-text content (photos, videos, etc.)
+    application.add_handler(MessageHandler(filters.PHOTO | filters.VIDEO | filters.ANIMATION | filters.VOICE | filters.AUDIO | filters.Document.ALL, merged_media_handler))
     
     # Admin Handlers
     application.add_handler(CommandHandler("admin", admin.admin_main_menu))
@@ -544,7 +590,7 @@ def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
     # Start the Bot
-    print("🚀 Bot is running...")
+    logger.info("🚀 Bot is running...")
     application.run_polling()
 
 if __name__ == "__main__":

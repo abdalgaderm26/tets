@@ -72,7 +72,6 @@ async def check_security(update: Update, context: ContextTypes.DEFAULT_TYPE):
     now = time.time()
     last_req = context.user_data.get('last_req_time', 0)
     if now - last_req < 1.5:
-        # Only notify once every few spams to avoid spamming the user back
         if not context.user_data.get('notified_rate_limit'):
             await update.effective_message.reply_text(get_str(user_id, 'RATE_LIMIT_MSG'), parse_mode="Markdown")
             context.user_data['notified_rate_limit'] = True
@@ -102,14 +101,11 @@ async def shop_currency_callback(update: Update, context: ContextTypes.DEFAULT_T
     user_id = update.effective_user.id
     await query.answer()
     
-    # HIGH-05 FIX + REM-01 CLEANUP: Use prefix slice for robust currency extraction
-    # This handles any currency name, including ones with underscores
     curr = query.data[len("buycurr_"):]
     packages = db.get_packages_by_currency(curr)
     
     keyboard = []
     for p in packages:
-        # p: (id, points, price, currency, instructions)
         btn_text = f"📦 {p[1]} نقطة - {p[2]} {p[3]}"
         keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"buypkg_{p[0]}")])
         
@@ -163,8 +159,6 @@ async def show_history(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     history_text = ""
     for t in txs:
-        # t: (id, user_id, amount, type, description, created_at)
-        # MED-02 FIX: t[5] (created_at) can be None if migration occurred — guard it
         raw_date = t[5] if t[5] else "N/A"
         date_str = raw_date.split(" ")[0] if " " in raw_date else raw_date
         history_text += "• {type}: {pts} ({date})\n".format(
@@ -197,9 +191,6 @@ async def set_language_callback(update: Update, context: ContextTypes.DEFAULT_TY
     db.set_user_lang(user_id, lang)
     
     if is_onboarding:
-        # REM-04 FIX: Don't send START_MSG twice.
-        # Step 1: Edit the inline language picker to a brief confirmation.
-        # Step 2: Send ONE new message with the full welcome + keyboard.
         confirm = "✅ تم اختيار اللغة!" if lang == 'ar' else "✅ Language set!"
         await query.edit_message_text(confirm)
         await context.bot.send_message(
@@ -209,7 +200,6 @@ async def set_language_callback(update: Update, context: ContextTypes.DEFAULT_TY
             parse_mode="Markdown"
         )
     else:
-        # For existing users changing settings
         msg = "✅ تم تحديث اللغة!" if lang == 'ar' else "✅ Language updated!"
         await query.edit_message_text(msg)
 
@@ -278,26 +268,21 @@ async def process_withdraw_text(update: Update, context: ContextTypes.DEFAULT_TY
         
         success = db.add_withdrawal_request(user_id, amount, method, text)
         if success:
-            # BUG-02 FIX: Use the dedicated DB function instead of raw sqlite3 connection
             wth_id = db.get_last_withdrawal_id(user_id)
-            
             admin_kb = [
                 [InlineKeyboardButton("✅ موافقة", callback_data=f"wthappr_{wth_id}")],
                 [InlineKeyboardButton("❌ رفض", callback_data=f"wthrej_{wth_id}")]
             ]
-            
             await context.bot.send_message(
                 c.ADMIN_ID,
                 get_str(user_id, 'ADMIN_NEW_WITHDRAW_MSG').format(user_id=user_id, amount=amount, method=method, details=text),
                 reply_markup=InlineKeyboardMarkup(admin_kb),
                 parse_mode="Markdown"
             )
-            
             await update.message.reply_text(get_str(user_id, 'WITHDRAW_SUCCESS'), parse_mode="Markdown")
         else:
             await update.message.reply_text(get_str(user_id, 'WITHDRAW_FAILED_POINTS'), parse_mode="Markdown")
             
-        # MED-03 FIX: Clean ALL withdraw state keys, not just wth_step
         for key in ['wth_step', 'wth_method', 'wth_amount']:
             context.user_data.pop(key, None)
         return True
@@ -311,29 +296,24 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     args = context.args
     
-    # Check registration
     is_new = db.register_user(user.id, user.username, initial_points=c.WELCOME_POINTS)
     
-    # Referral Logic
     if is_new and args:
         referrer_id = int(args[0])
-        if referrer_id != user.id: # Cannot refer self
+        if referrer_id != user.id:
             db.add_points(referrer_id, c.REFERRAL_POINTS)
-            db.update_daily_claim(user.id) # Initial setup for daily column
-            # Notify referrer
+            db.update_daily_claim(user.id)
             try:
                 await context.bot.send_message(referrer_id, get_str(referrer_id, 'REFERRAL_NOTIFICATION'), parse_mode="Markdown")
             except:
                 pass
 
     if is_new:
-        # Show Language Picker First for professional onboarding
         keyboard = [
             [InlineKeyboardButton("العربية 🇸🇦", callback_data="setlang_ar_onboard"),
              InlineKeyboardButton("English 🇺🇸", callback_data="setlang_en_onboard")]
         ]
         await update.message.reply_text(
-            # We use English/Arabic mixed prompt for the picker
             "👋 **Welcome! Please choose your preferred language to start:**\n\nيرجى اختيار لغتك للمتابعة:",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
@@ -353,12 +333,7 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user_data:
         return
 
-    # BUG-08 FIX: users table columns:
-    # (0)user_id, (1)username, (2)points, (3)referred_by, (4)last_daily,
-    # (5)is_admin, (6)is_banned, (7)language, (8)vip_until, (9)joined_at
     joined_at = user_data[9] if user_data[9] else 'N/A'
-    
-    # BUG-09 FIX: PROFILE_MSG uses {status} — must be passed
     lang = db.get_user_lang(user_id)
     if db.is_vip(user_id):
         status = "💎 VIP" if lang == 'ar' else "💎 VIP Member"
@@ -397,7 +372,7 @@ async def invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
-# --- STATS (Public or Admin) ---
+# --- STATS ---
 async def public_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     total_users, total_points = db.get_stats()
@@ -408,12 +383,10 @@ async def public_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
-# --- TASKS DISPLAY LOGIC (MOVED HERE FOR RELIABILITY) ---
+# --- TASKS DISPLAY LOGIC ---
 async def show_all_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     tasks_list = db.get_available_tasks(user_id)
-    
-    logger.info(f"🔍 User {user_id} clicked Tasks. Found: {len(tasks_list)} tasks in DB.")
     
     if not tasks_list:
         await update.effective_message.reply_text(get_str(user_id, 'TASKS_EMPTY'), parse_mode="Markdown")
@@ -435,141 +408,122 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text.strip() if update.message.text else ""
     
-    # --- BUG FIX: State Machine Killer ---
-    # If the user clicks a main keyboard button while stuck in a process (like withdraw/promo),
-    # we must clear all states so they don't get 'Enter valid number' errors forever.
-    main_menu_commands = [
-        "تنفيذ مهام", "🚀 Tasks", "👤 حسابي", "👤 Account", "💰 رصيد", "💰 Balance", 
-        "💎 VIP", "💬 Support", "الدعم الفني", "🎁 Daily Gift", "هدية يومية",
-        "💰 Withdraw", "سحب الأرباح", "🛒 Buy Points", "شراء نقاط", "🚀 Promote", "ترويج",
-        "📜 History", "السجل", "👥 Invite", "دعوة", "🌐 Language", "اللغة", 
-        "📊 Stats", "الإحصائيات", "/cancel", "/start"
+    # 0. Debug Command
+    if text == "/id":
+        await update.message.reply_text(f"👤 Your ID: `{user_id}`", parse_mode="Markdown")
+        return
+
+    # 1. State Machine Killer & Menu Check
+    menu_keywords = [
+        "مهام", "Tasks", "حسابي", "Account", "رصيد", "Balance", 
+        "VIP", "Support", "دعم", "Daily", "هدية",
+        "Withdraw", "سحب", "Buy", "شراء", "Promote", "ترويج",
+        "History", "سجل", "Invite", "دعوة", "Language", "لغة", 
+        "Stats", "إحصائيات", "/cancel", "/start"
     ]
     
-    is_main_command = any(cmd in text for cmd in main_menu_commands)
-    if is_main_command:
-        # Wipe all hanging states
+    is_menu_click = any(kw in text for kw in menu_keywords)
+    
+    if is_menu_click or text.startswith("/"):
         for key in ['state', 'wth_step', 'wth_method', 'wth_amount', 
                     'promo_step', 'promo_url', 'promo_budget', 'promo_reward',
                     'awaiting_admin_setting', 'replyING_to', 'admin_action']:
             context.user_data.pop(key, None)
-            
+        
         if text == "/cancel":
             await update.message.reply_text("✅ تم الإلغاء.", parse_mode="Markdown")
             return
 
-    # Check if admin is providing a setting value
-    if user_id == c.ADMIN_ID and context.user_data.get('awaiting_admin_setting'):
-        await admin.handle_admin_setting_input(update, context)
-        return
-        
-    # Check if admin is replying to support
-    if user_id == c.ADMIN_ID and context.user_data.get('replyING_to'):
-        await admin.handle_support_reply_text(update, context)
-        return
-        
-    # Check if user is sending a support message
-    if context.user_data.get('state') == 'support_msg':
-        del context.user_data['state']
-        await update.message.reply_text(get_str(user_id, 'SUPPORT_SUBMITTED'), parse_mode="Markdown")
-        # Forward to admin
-        keyboard = [[InlineKeyboardButton("✍️ الرد على المستخدم", callback_data=f"supreply_{user_id}")]]
-        await context.bot.send_message(
-            c.ADMIN_ID,
-            f"💬 **رسالة دعم فني جديدة!**\n\n👤 المستخدم: `{user_id}`\n📝 الرسالة: {text}",
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="Markdown"
-        )
-        return
-        
-    # NEW: Admin Global Actions (Broadcast/Support)
+    # 2. Admin Logic
     if user_id == c.ADMIN_ID:
-        if await admin.handle_broadcast_input(update, context):
+        if context.user_data.get('awaiting_admin_setting'):
+            await admin.handle_admin_setting_input(update, context)
             return
         if context.user_data.get('replyING_to'):
             await admin.handle_support_reply_text(update, context)
             return
+        if await admin.handle_broadcast_input(update, context):
+            return
 
-    if await process_withdraw_text(update, context):
-        return
+    # 3. User Flows
+    if not is_menu_click and not text.startswith("/"):
+        if await process_withdraw_text(update, context):
+            return
+        if await promo.process_promo_text(update, context):
+            return
         
-    if await promo.process_promo_text(update, context):
-        return
+        if context.user_data.get('state') == 'support_msg':
+            del context.user_data['state']
+            await update.message.reply_text(get_str(user_id, 'SUPPORT_SUBMITTED'), parse_mode="Markdown")
+            keyboard = [[InlineKeyboardButton("✍️ الرد على المستخدم", callback_data=f"supreply_{user_id}")]]
+            await context.bot.send_message(
+                c.ADMIN_ID,
+                f"💬 **رسالة دعم فني جديدة!**\n\n👤 المستخدم: `{user_id}`\n📝 الرسالة: {text}",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="Markdown"
+            )
+            return
 
-    if "تنفيذ مهام" in text or text == "🚀 Tasks":
+    # 4. Route Buttons
+    if "مهام" in text or "Tasks" in text:
         await show_all_tasks(update, context)
-    elif text in ("👤 حسابي", "👤 Account", "💰 رصيد", "💰 Balance"):
+    elif any(kw in text for kw in ["حسابي", "Account", "رصيد", "Balance"]):
         await profile(update, context)
-    elif text == "💎 VIP":
+    elif "VIP" in text:
         await vip.start_vip_menu(update, context)
-    elif "الدعم الفني" in text or text == "💬 Support":
+    elif any(kw in text for kw in ["دعم", "Support"]):
         context.user_data['state'] = 'support_msg'
         await update.message.reply_text(get_str(user_id, 'SUPPORT_MSG'), parse_mode="Markdown")
-    elif "هدية يومية" in text or text == "🎁 Daily Gift":
+    elif any(kw in text for kw in ["هدية", "Daily"]):
         await daily_gift(update, context)
-    elif "سحب الأرباح" in text or text == "💰 Withdraw":
+    elif any(kw in text for kw in ["سحب", "Withdraw"]):
         await start_withdraw(update, context)
-    elif "شراء نقاط" in text or text == "🛒 Buy Points":
+    elif any(kw in text for kw in ["شراء", "Buy"]):
         await start_shop(update, context)
-    elif "ترويج" in text or text == "🚀 Promote":
+    elif any(kw in text for kw in ["ترويج", "Promote"]):
         await promo.start_promo(update, context)
-    elif "السجل" in text or text == "📜 History":
+    elif any(kw in text for kw in ["سجل", "History"]):
         await show_history(update, context)
-    elif "دعوة" in text or text == "👥 Invite":
+    elif any(kw in text for kw in ["دعوة", "Invite"]):
         await invite(update, context)
-    elif "اللغة" in text or text == "🌐 Language":
+    elif any(kw in text for kw in ["لغة", "Language"]):
         await start_language_picker(update, context)
-    elif "الإحصائيات" in text or text == "📊 Stats":
+    elif any(kw in text for kw in ["إحصائيات", "Stats"]):
         await public_stats(update, context)
 
 # --- MAIN ---
 def main():
-    # Initialize Database
     db.init_db()
-    
-    # Create Application
     application = Application.builder().token(c.TOKEN).build()
     
-    # Handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("daily", daily_gift))
     application.add_handler(CommandHandler("points", profile))
     application.add_handler(CommandHandler("invite", invite))
     application.add_handler(CommandHandler("stats", public_stats))
     
-    # Task Handlers
     application.add_handler(CallbackQueryHandler(tasks.task_callback, pattern="^task_"))
     application.add_handler(CallbackQueryHandler(tasks.start_submission, pattern="^submit_"))
     application.add_handler(CallbackQueryHandler(withdraw_callback, pattern="^wth_(credit|transfer)$"))
     
-    # Shop & Promo Callbacks
     application.add_handler(CallbackQueryHandler(shop_currency_callback, pattern="^buycurr_"))
     application.add_handler(CallbackQueryHandler(shop_package_callback, pattern="^buypkg_"))
     application.add_handler(CallbackQueryHandler(promo.promo_callback, pattern="^promo_"))
     
-    # Message Handlers
     async def merged_media_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await check_security(update, context):
             return
-        # 1. Admin Broadcasting (Photos/Videos/etc.)
         if update.effective_user.id == c.ADMIN_ID:
             if await admin.handle_broadcast_input(update, context):
                 return
-        
-        # 2. Shop deposit (Photos)
         if update.message.photo:
             if await handle_deposit_proof(update, context):
                 return
-            # Standard task proof
             await tasks.handle_proof(update, context)
 
-    # Register generic media handler for all non-text content (photos, videos, etc.)
     application.add_handler(MessageHandler(filters.PHOTO | filters.VIDEO | filters.ANIMATION | filters.VOICE | filters.AUDIO | filters.Document.ALL, merged_media_handler))
     
-    # Admin Handlers
     application.add_handler(CommandHandler("admin", admin.admin_main_menu))
-    
-    # Core Admin Commands
     application.add_handler(CommandHandler("add_task", admin.add_task_cmd))
     application.add_handler(CommandHandler("set_api_key", admin.set_api_key_cmd))
     application.add_handler(CommandHandler("set_setting", admin.set_setting_cmd))
@@ -577,7 +531,6 @@ def main():
     application.add_handler(CommandHandler("ban", admin.ban_user_cmd))
     application.add_handler(CommandHandler("unban", admin.unban_user_cmd))
     
-    # Admin Callbacks
     application.add_handler(CallbackQueryHandler(admin.admin_main_menu, pattern="^admin_main$"))
     application.add_handler(CallbackQueryHandler(admin.stats_callback, pattern="^admin_stats$"))
     application.add_handler(CallbackQueryHandler(admin.admin_settings_menu, pattern="^admin_settings$"))
@@ -609,10 +562,8 @@ def main():
     application.add_handler(CallbackQueryHandler(admin.campaign_approve_callback, pattern="^cmpappr_"))
     application.add_handler(CallbackQueryHandler(admin.campaign_reject_callback, pattern="^cmprej_"))
     
-    # Text Messages
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
-    # Start the Bot
     logger.info("🚀 Bot is running...")
     application.run_polling()
 

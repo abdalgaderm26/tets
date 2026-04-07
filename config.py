@@ -16,6 +16,7 @@ if not TOKEN:
     raise RuntimeError("❌ BOT_TOKEN environment variable is not set!")
 
 # Admin ID (Your Telegram ID) - Used for admin commands
+# We default to a known value, but ALWAYS check environment first
 ADMIN_ID = int(os.getenv("ADMIN_ID", "5047634413"))
 
 # Rewards Configuration

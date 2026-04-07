@@ -256,6 +256,7 @@ async def handle_admin_setting_input(update: Update, context: ContextTypes.DEFAU
 
 async def admin_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != c.ADMIN_ID:
+        await update.message.reply_text("❌ **عذراً! أنت لست مديراً في هذا البوت.**\nيرجى كتابة `/id` للتأكد من رقم هويتك.")
         return
         
     user_id = update.effective_user.id

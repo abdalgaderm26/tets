@@ -1,8 +1,11 @@
+import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 import database as db
 import config as c
 import strings as s
+
+logger = logging.getLogger(__name__)
 
 def get_str(user_id, key, **kwargs):
     lang = db.get_user_lang(user_id)
@@ -24,8 +27,6 @@ async def pending_dashboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     msg = get_str(update.effective_user.id, 'ADMIN_PENDING_MSG').format(task_count=task_count, withd_count=withd_count)
     
-    # CRIT-01 FIX: pending_dashboard is called as a CallbackQueryHandler, so use query.
-    # It can also be called directly from a message, so handle both cases.
     if update.callback_query:
         await update.callback_query.answer()
         await update.callback_query.edit_message_text(
@@ -47,7 +48,6 @@ async def review_tasks_callback(update: Update, context: ContextTypes.DEFAULT_TY
         await query.edit_message_text("✅ **لا توجد مهام معلقة حالياً!**")
         return
         
-    # task: (id, user_id, task_id, screenshot_id, status, submitted_at)
     sub_id, user_id, task_id, photo_id, status, date = task
     task_info = db.get_task_by_id(task_id)
     
@@ -58,7 +58,7 @@ async def review_tasks_callback(update: Update, context: ContextTypes.DEFAULT_TY
         [InlineKeyboardButton("🔙 العودة للقائمة", callback_data="admin_main")]
     ]
     
-    await query.message.delete() # Delete dashboard message
+    await query.message.delete()
     await context.bot.send_photo(
         c.ADMIN_ID,
         photo=photo_id,
@@ -78,7 +78,6 @@ async def review_withd_callback(update: Update, context: ContextTypes.DEFAULT_TY
         await query.edit_message_text("✅ **لا توجد طلبات سحب معلقة حالياً!**")
         return
         
-    # withd: (id, user_id, amount, method, details, status, created_at)
     w_id, user_id, amount, method, details, status, date = withd
     
     keyboard = [
@@ -196,7 +195,6 @@ async def admin_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
         [InlineKeyboardButton("🔙 العودة للقائمة", callback_data="admin_main")]
     ]
     
-    # Get current values for info
     usdt = db.get_setting('usdt_wallet', 'غير محدد')
     v_mult = db.get_setting('vip_multiplier', '2.0')
     v_price = db.get_setting('vip_price', '1000')
@@ -210,13 +208,12 @@ async def admin_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     )
 
 async def admin_setting_edit_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # CRIT-05 FIX: Add mandatory ADMIN_ID security check
     if update.effective_user.id != c.ADMIN_ID:
         return
     query = update.callback_query
     await query.answer()
     
-    setting_type = query.data  # e.g., "set_usdt_start"
+    setting_type = query.data
     context.user_data['awaiting_admin_setting'] = setting_type
     
     labels = {
@@ -252,49 +249,47 @@ async def handle_admin_setting_input(update: Update, context: ContextTypes.DEFAU
     del context.user_data['awaiting_admin_setting']
     
     await update.message.reply_text(f"✅ **تم تحديث الإعداد بنجاح!**\nالقيمة الجديدة: `{new_val}`", parse_mode="Markdown")
-    # Show menu again
     await admin_settings_menu(update, context)
 
 # --- ADMIN DASHBOARD ---
 
 async def admin_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    logger.info(f"👮 Admin Attempt: User {user_id} accessing /admin")
+    logger.info(f"👮 Admin Attempt: User {user_id} | Required: {c.ADMIN_ID}")
 
     try:
         if user_id != c.ADMIN_ID:
-            logger.warning(f"🚫 Denied: User {user_id} is not the configured ADMIN_ID ({c.ADMIN_ID})")
+            logger.warning(f"🚫 Denied: {user_id} != {c.ADMIN_ID}")
             msg = f"❌ **عذراً! أنت لست مديراً.**\n\n👤 الأيدي الخاص بك: `{user_id}`\n🔑 الأيدي المسجل: `{c.ADMIN_ID}`\n\nيرجى مطابقة الأرقام في Railway."
             if update.callback_query:
                 await update.callback_query.answer(msg, show_alert=True)
             else:
                 await update.message.reply_text(msg, parse_mode="Markdown")
             return
-        
-    user_id = update.effective_user.id
-    total_users, total_points = db.get_stats()
-    
-    # We use ADMIN_DASHBOARD_OVERVIEW from strings.py
-    text = get_str(user_id, 'ADMIN_DASHBOARD_OVERVIEW', total_users=total_users, total_points=total_points)
-    
-    # Check maintenance status
-    m_mode = db.get_setting('maintenance_mode', 'off')
-    m_icon = "🟢" if m_mode == 'off' else "🔴"
-    text += f"\n\n⚙️ حالة الصيانة: {m_icon} **{m_mode.upper()}**"
-    
+
+        total_users, total_points = db.get_stats()
+        text = get_str(user_id, 'ADMIN_DASHBOARD_OVERVIEW', total_users=total_users, total_points=total_points)
+
+        m_mode = db.get_setting('maintenance_mode', 'off')
+        m_icon = "🟢" if m_mode == 'off' else "🔴"
+        text += f"\n\n⚙️ حالة الصيانة: {m_icon} **{m_mode.upper()}**"
+
         if update.callback_query:
             await update.callback_query.answer()
             await update.callback_query.edit_message_text(text, reply_markup=await admin_buttons_keyboard(), parse_mode="Markdown")
         else:
             await update.message.reply_text(text, reply_markup=await admin_buttons_keyboard(), parse_mode="Markdown")
-        
-        logger.info(f"✅ Success: Admin menu sent to {user_id}")
+
+        logger.info(f"✅ Admin menu sent to {user_id}")
 
     except Exception as e:
         logger.error(f"💥 Admin Menu Error: {str(e)}", exc_info=True)
         error_msg = f"⚠️ **خطأ تقني في لوحة الإدارة:**\n`{str(e)}`"
         if update.callback_query:
-            await update.callback_query.answer(error_msg, show_alert=True)
+            try:
+                await update.callback_query.answer(error_msg, show_alert=True)
+            except:
+                pass
         else:
             await update.message.reply_text(error_msg, parse_mode="Markdown")
 

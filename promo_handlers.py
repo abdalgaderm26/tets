@@ -4,9 +4,12 @@ import database as db
 import config as c
 import strings as s
 
-def get_str(user_id, key):
+def get_str(user_id, key, **kwargs):
     lang = db.get_user_lang(user_id)
-    return s.STRINGS.get(lang, s.STRINGS['ar']).get(key, s.STRINGS['ar'].get(key, key))
+    text = s.STRINGS.get(lang, s.STRINGS['ar']).get(key, s.STRINGS['ar'].get(key, key))
+    if kwargs:
+        return text.format(**kwargs)
+    return text
 
 async def start_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id

@@ -408,9 +408,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text.strip() if update.message.text else ""
     
-    # 0. Debug Command
+    # 0. Version & Logging (For debugging conflict)
+    logger.info(f"📩 [{user_id}] sent: {text} | Ver: 1.5-Fixed")
     if text == "/id":
         await update.message.reply_text(f"👤 Your ID: `{user_id}`", parse_mode="Markdown")
+        return
+    if text == "/reset":
+        context.user_data.clear()
+        await update.message.reply_text("🔄 **تم تصفير كافة الحالات.**")
         return
 
     # 1. State Machine Killer & Menu Check
@@ -564,7 +569,11 @@ def main():
     
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
-    logger.info("🚀 Bot is running...")
+    # Start the Bot
+    logger.info("----------------------------------------")
+    logger.info("🚀 BOT IS STARTING... VERSION: 1.6-Stable")
+    logger.info(f"👮 CONFIGURED ADMIN_ID: {c.ADMIN_ID}")
+    logger.info("----------------------------------------")
     application.run_polling()
 
 if __name__ == "__main__":

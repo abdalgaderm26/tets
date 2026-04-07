@@ -258,9 +258,18 @@ async def handle_admin_setting_input(update: Update, context: ContextTypes.DEFAU
 # --- ADMIN DASHBOARD ---
 
 async def admin_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != c.ADMIN_ID:
-        await update.message.reply_text("❌ **عذراً! أنت لست مديراً في هذا البوت.**\nيرجى كتابة `/id` للتأكد من رقم هويتك.")
-        return
+    user_id = update.effective_user.id
+    logger.info(f"👮 Admin Attempt: User {user_id} accessing /admin")
+
+    try:
+        if user_id != c.ADMIN_ID:
+            logger.warning(f"🚫 Denied: User {user_id} is not the configured ADMIN_ID ({c.ADMIN_ID})")
+            msg = f"❌ **عذراً! أنت لست مديراً.**\n\n👤 الأيدي الخاص بك: `{user_id}`\n🔑 الأيدي المسجل: `{c.ADMIN_ID}`\n\nيرجى مطابقة الأرقام في Railway."
+            if update.callback_query:
+                await update.callback_query.answer(msg, show_alert=True)
+            else:
+                await update.message.reply_text(msg, parse_mode="Markdown")
+            return
         
     user_id = update.effective_user.id
     total_users, total_points = db.get_stats()
@@ -273,11 +282,21 @@ async def admin_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     m_icon = "🟢" if m_mode == 'off' else "🔴"
     text += f"\n\n⚙️ حالة الصيانة: {m_icon} **{m_mode.upper()}**"
     
-    if update.callback_query:
-        await update.callback_query.answer()
-        await update.callback_query.edit_message_text(text, reply_markup=await admin_buttons_keyboard(), parse_mode="Markdown")
-    else:
-        await update.message.reply_text(text, reply_markup=await admin_buttons_keyboard(), parse_mode="Markdown")
+        if update.callback_query:
+            await update.callback_query.answer()
+            await update.callback_query.edit_message_text(text, reply_markup=await admin_buttons_keyboard(), parse_mode="Markdown")
+        else:
+            await update.message.reply_text(text, reply_markup=await admin_buttons_keyboard(), parse_mode="Markdown")
+        
+        logger.info(f"✅ Success: Admin menu sent to {user_id}")
+
+    except Exception as e:
+        logger.error(f"💥 Admin Menu Error: {str(e)}", exc_info=True)
+        error_msg = f"⚠️ **خطأ تقني في لوحة الإدارة:**\n`{str(e)}`"
+        if update.callback_query:
+            await update.callback_query.answer(error_msg, show_alert=True)
+        else:
+            await update.message.reply_text(error_msg, parse_mode="Markdown")
 
 async def admin_buttons_keyboard():
     m_mode = db.get_setting('maintenance_mode', 'off')
